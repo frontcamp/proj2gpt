@@ -1,0 +1,55 @@
+Proj2GPT Noncommercial No-Derivatives License (PNND) v1.0
+
+Copyright (C) 2025 Maksym Plaksin
+
+1. Definitions
+“Software” means the proj2gpt source code and accompanying materials.
+“You” means any individual or entity exercising permissions under this License.
+“Noncommercial” means not primarily intended for or directed toward commercial
+advantage or monetary compensation, including production/SaaS use.
+
+2. Grant of Rights
+Subject to the terms below, the Licensor grants You a worldwide, royalty-free,
+non-transferable, non-sublicensable license to:
+(a) use and run the unmodified Software for personal, educational, research,
+or internal evaluation purposes only; and
+(b) reproduce and redistribute exact, unmodified copies of the Software,
+provided that (i) this License and copyright notice are included; and
+(ii) clear attribution to “Maksym Plaksin – proj2gpt” with a link to the
+repository is provided.
+
+3. Restrictions
+You may NOT:
+(a) use the Software for any commercial, revenue-generating, client-facing,
+production, or SaaS/hosted service purpose;
+(b) modify, translate, adapt, reverse engineer (except as permitted by law),
+or create derivative works of the Software;
+(c) distribute, publish, or make available any modified version, fork,
+patch, or partial extraction of the Software;
+(d) remove or alter attribution, notices, or this License;
+(e) use any names, logos, or trademarks of the Licensor; or
+(f) sublicense the Software or grant further rights.
+
+4. Patents
+No patent rights are granted. If You initiate or join a patent claim alleging
+that the unmodified Software infringes a patent, this License terminates
+automatically as of the filing date.
+
+5. Termination
+This License terminates automatically upon any breach. Upon termination You
+must cease use and distribution. The Licensor may, at sole discretion, offer
+reinstatement upon a timely cure.
+
+6. Disclaimer of Warranty
+THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE, AND NON-INFRINGEMENT.
+
+7. Limitation of Liability
+IN NO EVENT WILL THE LICENSOR BE LIABLE FOR ANY CLAIM, DAMAGES, OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT, OR OTHERWISE, ARISING FROM,
+OUT OF, OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+THE SOFTWARE.
+
+8. Entire Agreement
+This License constitutes the entire agreement concerning the Software.
