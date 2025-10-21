@@ -19,11 +19,11 @@ __version__ = '0.1.0'
 __author__ = 'Maksym Plaksin <maxim.plaksin@gmail.com>'
 __repo__ = 'https://github.com/frontcamp/proj2gpt'
 
-INTRO = f"""{__app__} {__version__}
+INTRO = f'''{__app__} {__version__}
 Pack project text sources into TXT containers for ChatGPT.
 Copyright (C) 2025 {__author__}
 {__repo__}
-"""
+'''
 
 
 INI_NAME = 'proj2gpt.ini'
@@ -49,7 +49,7 @@ DEFAULTS = {
 }
 
 def _parse_semicolon_list(value):
-    return [p.strip() for p in value.split(";") if p.strip()]
+    return [p.strip() for p in value.split(';') if p.strip()]
 
 def load_config(project_root):
     ini_path = Path(project_root) / INI_NAME
@@ -73,7 +73,7 @@ def load_config(project_root):
     secrets = []
     if cp.has_section('secrets'):
         for key, value in cp.items('secrets'):
-            line = (key + " " + value).strip()
+            line = (key + ' ' + value).strip()
             parts = line.split()
             if len(parts) >= 4 and parts[0].lower() == 'replace':
                 secrets.append({
@@ -124,6 +124,6 @@ def main():
     return 0
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     sys.exit(main())
 
