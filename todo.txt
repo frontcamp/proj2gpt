@@ -1,0 +1,29 @@
+
+
+TODO
+====
+
+
+- reading & output configuration
+- merge names_ignored with .gitignore (if enabled & file exists)
+- add destination folder to ignored
+- write a recursive directory traversal
+- sort files & folders alphabetically with natural number order
+  process files first, then sub-folders
+- generating TXT containers respecting max_size, chunks
+  handle exceptions (symlinks, rights)
+  UTF-8 -> detect -> recoding to UTF-8
+  CRLF normalizing
+  add file path, size, hash
+  replace/skip secrets
+- TOC at the beginning of each TXT container
+- general INDEX file
+- instructions.txt (project description to AI model)
+- on-screen reporting, logging
+- add to documentation note about symlink ignoring
+
+
+DONE
+====
+
+
