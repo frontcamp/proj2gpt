@@ -1,17 +1,21 @@
 #!/usr/bin/env python3
 
+# File naming convention:
+#   *_file - file name
+#   *_path - relative path to file or folder
+#   *_root - absolute path to file or folder
 
-import os
-import sys
+
+import os, re, sys
 import configparser
-from pathlib import Path
 
 
 LOG_NAME = 'proj2gpt.log'
 
 def error_reporting(err_message):
     print(err_message)
-    # write err_message to log file
+    with open(LOG_NAME, 'a', encoding='utf-8') as f:
+        f.write(msg + '\n')
 
 
 __app__ = 'proj2gpt'
@@ -29,59 +33,66 @@ Copyright (C) 2025 {__author__}
 INI_NAME = 'proj2gpt.ini'
 
 DEFAULTS = {
-    'project': {
+    'PROJECT': {
         'project_title': 'Super-duper project',
         'project_descr': 'Short project description',
+        'group_paths': '',    # <group_path1>[, <group_path2> ...]
+        'group_roots': '',    # <group_root1>[, <group_root2> ...]
+        'secrets_auto': '1',  # auto replace everything to <name>.gpt
+        'secrets_list': '',   # <secret_path>@<dummy_filename>[, ...]
     },
-    'traversal': {
-        'names_allowed': '*.cfg;*.css;*.ini;*.js;*.md;*.php;*.py;*.txt;',
-        'names_ignored': '*.gpt;.git;logs;temp;',
+    'TRAVERSAL': {
+        'names_allowed': '*.cfg,*.conf,*.css,*.html,*.ini,*.js,*.json,*.md,*.php,*.py,*.txt,*.xml',
+        'names_ignored': '*.gpt,.git*,/logs,/temp,/test',
         'use_gitignore': '1',
         'max_file_size': '1000000',
     },
-    'generator': {
-        'dest_folder': 'proj2gpt',
+    'GENERATOR': {
+        'dest_path': '/proj2gpt',
         'txt_size_max': '3000000',
-        'log_max_lines': '3000', 
+        'log_lines_max': '3000', 
     },
-    # [secrets]
-    # free-form lines: "replace /path original replacement"
 }
 
-def _parse_semicolon_list(value):
-    return [p.strip() for p in value.split(';') if p.strip()]
+def bool2str (b): return 'Yes' if b else 'No'
+
+def _parse_ini_list(s):
+    return [x.strip() for x in re.split(r'[,\n]+', s.strip()) if x.strip()]
 
 def load_config(project_root):
-    ini_path = Path(project_root) / INI_NAME
+        
+    ini_path = os.path.normpath(os.path.join(project_root, INI_NAME))
+    
     cp = configparser.ConfigParser()
     cp.read_dict(DEFAULTS)
-    if ini_path.exists():
-        cp.read(str(ini_path), encoding='utf-8')
+    if os.path.isfile(ini_path):
+        cp.read(ini_path, encoding='utf-8')
 
     settings = {}
-    settings['project_root'] = Path(project_root)
-    settings['project_title'] = cp.get('project', 'project_title').strip('"\'')
-    settings['project_descr'] = cp.get('project', 'project_descr').strip('"\'')
-    settings['names_allowed'] = _parse_semicolon_list(cp.get('traversal', 'names_allowed'))
-    settings['names_ignored'] = _parse_semicolon_list(cp.get('traversal', 'names_ignored'))
-    settings['use_gitignore'] = cp.getint('traversal', 'use_gitignore')
-    settings['max_file_size'] = cp.getint('traversal', 'max_file_size')
-    settings['dest_folder'] = Path(cp.get('generator', 'dest_folder').strip('"\''))
-    settings['txt_size_max'] = cp.getint('generator', 'txt_size_max')
-    settings['log_max_lines'] = cp.getint('generator', 'log_max_lines')
+    settings['project_root'] = project_root
 
-    secrets = []
-    if cp.has_section('secrets'):
-        for key, value in cp.items('secrets'):
-            line = (key + ' ' + value).strip()
-            parts = line.split()
-            if len(parts) >= 4 and parts[0].lower() == 'replace':
-                secrets.append({
-                    'base': Path(parts[1]),
-                    'original': parts[2],
-                    'replacement': parts[3],
-                })
-    settings['secrets'] = secrets
+    settings['project_title'] = cp.get('PROJECT', 'project_title')
+    settings['project_descr'] = cp.get('PROJECT', 'project_descr')
+    settings['group_paths'] = _parse_ini_list(cp.get('PROJECT', 'group_paths'))
+    settings['group_roots'] = _parse_ini_list(cp.get('PROJECT', 'group_roots'))
+    settings['secrets_auto'] = cp.getboolean('PROJECT', 'secrets_auto')
+    settings['secrets_list'] = _parse_ini_list(cp.get('PROJECT', 'secrets_list'))
+
+    settings['names_allowed'] = _parse_ini_list(cp.get('TRAVERSAL', 'names_allowed'))
+    settings['names_ignored'] = _parse_ini_list(cp.get('TRAVERSAL', 'names_ignored'))
+    settings['use_gitignore'] = cp.getboolean('TRAVERSAL', 'use_gitignore')
+    settings['max_file_size'] = cp.getint('TRAVERSAL', 'max_file_size')
+
+    settings['dest_path'] = cp.get('GENERATOR', 'dest_path').strip()
+    settings['txt_size_max'] = cp.getint('GENERATOR', 'txt_size_max')
+    settings['log_lines_max'] = cp.getint('GENERATOR', 'log_lines_max')
+
+    # define destination root folder
+    dest_path = settings['dest_path']
+    if dest_path.startswith(('/', '\\')):
+        dest_path = dest_path.lstrip('/\\')
+        settings['dest_path'] = dest_path
+    settings['dest_root'] = os.path.abspath(os.path.join(project_root, dest_path))
 
     return settings
 
@@ -90,25 +101,24 @@ def print_intro():
     print(INTRO)
 
 
-def ensure_destination(settings):
-    dest = settings['project_root'] / settings['dest_folder']
-    os.makedirs(dest, exist_ok=True)
-    return dest
-
 def summarize_settings(s):
     lines = [
-        'Settings:',
-        '  project_root: %s' % s['project_root'],
-        '  project_title: %s' % s['project_title'],
-        '  project_descr: %s' % s['project_descr'],
-        '  names_allowed: %s' % (';'.join(s['names_allowed']) if s['names_allowed'] else '(none)'),
-        '  names_ignored: %s' % (';'.join(s['names_ignored']) if s['names_ignored'] else '(none)'),
-        '  use_gitignore: %s' % s['use_gitignore'],
-        '  max_file_size: %s' % s['max_file_size'],
-        '  dest_folder: %s' % (s['project_root'] / s['dest_folder']),
-        '  txt_size_max: %s' % s['txt_size_max'],
-        '  log_max_lines: %s' % s['log_max_lines'],
-        '  secrets rules: %d' % len(s['secrets']),
+        'SETTINGS:',
+        '[P] project_root: %s' % s['project_root'],
+        '[P] project_title: %s' % s['project_title'],
+        '[P] project_descr: %s' % s['project_descr'],
+        '[P] group_paths: %s' % (', '.join(s['group_paths']) if s['group_paths'] else '<none>'),
+        '[P] group_roots: %s' % (', '.join(s['group_roots']) if s['group_roots'] else '<none>'),
+        '[P] secrets_auto: %s' % bool2str(s['secrets_auto']),
+        '[P] secrets_list: %s' % (', '.join(s['secrets_list']) if s['secrets_list'] else '<none>'),
+        '[T] names_allowed: %s' % (', '.join(s['names_allowed']) if s['names_allowed'] else '<none>'),
+        '[T] names_ignored: %s' % (', '.join(s['names_ignored']) if s['names_ignored'] else '<none>'),
+        '[T] use_gitignore: %s' % bool2str(s['use_gitignore']),
+        '[T] max_file_size: %s' % s['max_file_size'],
+        '[G] dest_path: %s' % (s['dest_path'])  ,
+        '[G] dest_root: %s' % (s['dest_root'])  ,
+        '[G] txt_size_max: %s' % s['txt_size_max'],
+        '[G] log_lines_max: %s' % s['log_lines_max'],
     ]
     return '\n'.join(lines)
 
@@ -116,9 +126,9 @@ def summarize_settings(s):
 def main():
 
     print_intro()
-    root = Path.cwd()
+    root = os.getcwd()
     settings = load_config(root)
-    ensure_destination(settings)
+    os.makedirs(settings['dest_root'], exist_ok=True)
     print(summarize_settings(settings))
     
     return 0
