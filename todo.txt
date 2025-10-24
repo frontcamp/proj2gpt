@@ -4,7 +4,6 @@ TODO
 ====
 
 
-- reading & output configuration
 - merge names_ignored with .gitignore (if enabled & file exists)
 - add destination folder to ignored
 - write a recursive directory traversal
@@ -27,3 +26,4 @@ DONE
 ====
 
 
++ reading & output configuration

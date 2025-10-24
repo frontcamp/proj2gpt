@@ -1,38 +1,98 @@
 #!/usr/bin/env python3
 
-# File naming convention:
+# Naming convention:
+#   UPPER_CASE - constants
+#   lower_case - variables
 #   *_file - file name
 #   *_path - relative path to file or folder
 #   *_root - absolute path to file or folder
+#   *_nls - no leading slash
 
-
-import os, re, sys
+import os
+import re
+import sys
 import configparser
+from datetime import datetime, timezone
+from pprint import pprint
 
+#
+# LOGGING
+#
 
 LOG_NAME = 'proj2gpt.log'
+LOG_ROOT = os.path.join(os.getcwd(), LOG_NAME)
 
-def error_reporting(err_message):
-    print(err_message)
-    with open(LOG_NAME, 'a', encoding='utf-8') as f:
-        f.write(msg + '\n')
+LOG_TMSG = 1
+LOG_TDIV = 2
+LOG_TSEP = 4
 
+def log_output(message, type=LOG_TMSG, display=True, date=False):
+    if type == LOG_TMSG and display:
+        print(message)
+    with open(LOG_ROOT, 'a', encoding='utf-8') as f:
+        if type != LOG_TMSG:
+            f.write(message+'\n')
+        else:
+            now = datetime.now(timezone.utc)
+            if date:
+                ts = f"[{now:%Y-%m-%d %H:%M:%S}.{now.microsecond//1000:03d} Z] "
+            else:
+                ts = f"[{now:%H:%M:%S}.{now.microsecond//1000:03d} Z] "
+            f.write(f'{ts}{message}\n')
+
+def log_divider():
+    log_output('='*20, LOG_TDIV)
+
+def log_separator():
+    log_output('-'*10, LOG_TSEP)
+
+def log_message(message, display=True, date=False):
+    log_output(message, type=LOG_TMSG, display=display, date=date)
+
+#
+# COMMON FUNCTIONALITY
+#
+
+def rm_leading_slash(path):
+    return path.lstrip('/\\') if path.startswith(('/', '\\')) else path
+
+def op_normpath(path): return os.path.normcase(os.path.normpath(path))
+def op_normjoin(*paths): return op_normpath(os.path.join(*paths))
+def op_absjoin(*paths): return os.path.abspath(op_normjoin(*paths))
+
+def bool2str(b): return 'Yes' if b else 'No'
+def str2bool(s): return str(s).strip().lower() in ('1', 'true', 'yes', 'on')
+
+#
+# INTRO
+#
 
 __app__ = 'proj2gpt'
 __version__ = '0.1.0'
 __author__ = 'Maksym Plaksin <maxim.plaksin@gmail.com>'
 __repo__ = 'https://github.com/frontcamp/proj2gpt'
 
-INTRO = f'''{__app__} {__version__}
-Pack project text sources into TXT containers for ChatGPT.
+INTRO_MAIN = f'''{__app__} {__version__}'''
+INTRO_MORE = f'''Pack project text sources into TXT containers for ChatGPT.
 Copyright (C) 2025 {__author__}
-{__repo__}
-'''
+{__repo__}'''
 
+def print_intro(verbose):
+    print(INTRO_MAIN)
+    if verbose:
+        print(INTRO_MORE)
+    print()
+
+#
+# CONFIGURATION
+#
 
 INI_NAME = 'proj2gpt.ini'
 
 DEFAULTS = {
+    'SETTINGS': {
+        'verbose': '1',  # show status & progress information
+    },
     'PROJECT': {
         'project_title': 'Super-duper project',
         'project_descr': 'Short project description',
@@ -43,7 +103,7 @@ DEFAULTS = {
     },
     'TRAVERSAL': {
         'names_allowed': '*.cfg,*.conf,*.css,*.html,*.ini,*.js,*.json,*.md,*.php,*.py,*.txt,*.xml',
-        'names_ignored': '*.gpt,.git*,/logs,/temp,/test',
+        'names_ignored': '.git*,/logs,/temp,/test',
         'use_gitignore': '1',
         'max_file_size': '1000000',
     },
@@ -54,14 +114,13 @@ DEFAULTS = {
     },
 }
 
-def bool2str (b): return 'Yes' if b else 'No'
-
 def _parse_ini_list(s):
-    return [x.strip() for x in re.split(r'[,\n]+', s.strip()) if x.strip()]
+    s = (s or '').strip()
+    return [x.strip() for x in re.split(r'[,\n]+', s) if x.strip()]
 
-def load_config(project_root):
+def load_config(proj_root):
         
-    ini_path = os.path.normpath(os.path.join(project_root, INI_NAME))
+    ini_path = op_normjoin(proj_root, INI_NAME)
     
     cp = configparser.ConfigParser()
     cp.read_dict(DEFAULTS)
@@ -69,7 +128,9 @@ def load_config(project_root):
         cp.read(ini_path, encoding='utf-8')
 
     settings = {}
-    settings['project_root'] = project_root
+    settings['project_root'] = proj_root
+
+    settings['verbose'] = cp.getboolean('SETTINGS', 'verbose')
 
     settings['project_title'] = cp.get('PROJECT', 'project_title')
     settings['project_descr'] = cp.get('PROJECT', 'project_descr')
@@ -88,48 +149,164 @@ def load_config(project_root):
     settings['log_lines_max'] = cp.getint('GENERATOR', 'log_lines_max')
 
     # define destination root folder
-    dest_path = settings['dest_path']
-    if dest_path.startswith(('/', '\\')):
-        dest_path = dest_path.lstrip('/\\')
-        settings['dest_path'] = dest_path
-    settings['dest_root'] = os.path.abspath(os.path.join(project_root, dest_path))
+    dest_path = op_normpath(settings['dest_path'])
+    dest_path_nls = rm_leading_slash(dest_path)
+    settings['dest_root'] = op_absjoin(proj_root, dest_path_nls)
+
+    # add self files & folders to ignored
+    settings['names_ignored'].append(dest_path)
+    settings['names_ignored'].append('*.gpt')
 
     return settings
 
-
-def print_intro():
-    print(INTRO)
-
-
-def summarize_settings(s):
+def summarize_settings(settings):
     lines = [
         'SETTINGS:',
-        '[P] project_root: %s' % s['project_root'],
-        '[P] project_title: %s' % s['project_title'],
-        '[P] project_descr: %s' % s['project_descr'],
-        '[P] group_paths: %s' % (', '.join(s['group_paths']) if s['group_paths'] else '<none>'),
-        '[P] group_roots: %s' % (', '.join(s['group_roots']) if s['group_roots'] else '<none>'),
-        '[P] secrets_auto: %s' % bool2str(s['secrets_auto']),
-        '[P] secrets_list: %s' % (', '.join(s['secrets_list']) if s['secrets_list'] else '<none>'),
-        '[T] names_allowed: %s' % (', '.join(s['names_allowed']) if s['names_allowed'] else '<none>'),
-        '[T] names_ignored: %s' % (', '.join(s['names_ignored']) if s['names_ignored'] else '<none>'),
-        '[T] use_gitignore: %s' % bool2str(s['use_gitignore']),
-        '[T] max_file_size: %s' % s['max_file_size'],
-        '[G] dest_path: %s' % (s['dest_path'])  ,
-        '[G] dest_root: %s' % (s['dest_root'])  ,
-        '[G] txt_size_max: %s' % s['txt_size_max'],
-        '[G] log_lines_max: %s' % s['log_lines_max'],
+        ' [P] project_root: %s' % settings['project_root'],
+        ' [P] project_title: %s' % settings['project_title'],
+        ' [P] project_descr: %s' % settings['project_descr'],
+        ' [P] group_paths: %s' % (', '.join(settings['group_paths']) if settings['group_paths'] else '<none>'),
+        ' [P] group_roots: %s' % (', '.join(settings['group_roots']) if settings['group_roots'] else '<none>'),
+        ' [P] secrets_auto: %s' % bool2str(settings['secrets_auto']),
+        ' [P] secrets_list: %s' % (', '.join(settings['secrets_list']) if settings['secrets_list'] else '<none>'),
+        ' [T] names_allowed: %s' % (', '.join(settings['names_allowed']) if settings['names_allowed'] else '<none>'),
+        ' [T] names_ignored: %s' % (', '.join(settings['names_ignored']) if settings['names_ignored'] else '<none>'),
+        ' [T] use_gitignore: %s' % bool2str(settings['use_gitignore']),
+        ' [T] max_file_size: %s' % settings['max_file_size'],
+        ' [G] dest_path: %s' % (settings['dest_path'])  ,
+        ' [G] dest_root: %s' % (settings['dest_root'])  ,
+        ' [G] txt_size_max: %s' % settings['txt_size_max'],
+        ' [G] log_lines_max: %s' % settings['log_lines_max'],
     ]
     return '\n'.join(lines)
 
+#
+# COLLECTING DATA
+#
+
+def group_roots_to_paths(proj_root, settings):
+    
+    group_paths = settings['group_paths']  # [] - relative paths list
+    paths_seen = set()
+
+    group_roots = settings['group_roots']  # [] - relative paths list
+    roots_seen = set()
+
+    # normalize group paths
+    paths = []
+    for group_path in group_paths:
+        _rel_path = op_normpath(group_path)
+        _rel_path_nls = rm_leading_slash(_rel_path)
+        group_root = op_absjoin(proj_root, _rel_path_nls)
+        if os.path.isdir(group_root):
+            paths.append(_rel_path)
+            paths_seen.add(_rel_path)
+        else:
+            log_message(f'Error: Group not found: {group_path} ({group_root})')
+    group_paths = paths  # reinit with checked and normalized paths
+
+    for _rel_root in group_roots:
+        _rel_root = op_normpath(_rel_root)
+        _rel_root_nls = rm_leading_slash(_rel_root)
+        group_root = op_absjoin(proj_root, _rel_root_nls)
+        if not os.path.isdir(group_root):
+            log_message(f'Error: Group root not found: {_rel_root} ({group_root})')
+            continue
+        roots_seen.add(_rel_root)
+        try:
+            entries = sorted(os.listdir(group_root), key=str.casefold)
+        except PermissionError:
+            log_message(f'Error: Access denied to: {_rel_root} ({group_root})')
+            continue
+        for group_name in entries:
+            sub_group_root = op_normjoin(group_root, group_name)
+            if (os.path.islink(sub_group_root)       # symlink
+             or not os.path.isdir(sub_group_root)):  # not folder
+                continue
+            sub_group_path = op_normjoin(_rel_root, group_name)
+            if sub_group_path not in paths_seen:
+                group_paths.append(sub_group_path)
+                paths_seen.add(sub_group_path)
+
+    settings['group_paths'] = sorted(paths_seen)
+    settings['group_roots'] = sorted(roots_seen)
+
+def traverse(root: str):
+    root_abs = os.path.abspath(root)
+    res = []
+
+    def rel(p): return os.path.relpath(p, root_abs).replace('\\', '/')
+
+    def walk(d_abs: str):
+        d_rel = '' if d_abs == root_abs else rel(d_abs)
+        d_name = os.path.basename(d_abs)
+
+        files, dirs = [], []
+        with os.scandir(d_abs) as it:
+            for e in it:
+                if e.is_file(follow_symlinks=False):
+                    files.append(e)
+                elif e.is_dir(follow_symlinks=False):
+                    dirs.append(e)
+
+        files.sort(key=lambda e: e.name.lower())
+        dirs.sort(key=lambda e: e.name.lower())
+
+        for e in files:
+            st = e.stat(follow_symlinks=False)
+            res.append({
+                'dir_name': d_name,
+                'dir_path': d_rel,
+                'dir_root': d_abs,
+                'file_name': e.name,
+                'file_path': d_rel,
+                'file_size': st.st_size,
+                'is_symlink': e.is_symlink(),
+            })
+
+        for sub in dirs:
+            sub_abs = sub.path
+            res.append({
+                'dir_name': sub.name,
+                'dir_path': rel(sub_abs),
+                'dir_root': sub_abs,
+            })
+            walk(sub_abs)
+
+    walk(root_abs)
+    
+    pprint(res, sort_dicts=False)
+    return res
+
 
 def main():
+    global LOG_ROOT
 
-    print_intro()
-    root = os.getcwd()
-    settings = load_config(root)
+    proj_root = os.getcwd()
+    settings = load_config(proj_root)
+    verbose = settings['verbose']
+
     os.makedirs(settings['dest_root'], exist_ok=True)
-    print(summarize_settings(settings))
+
+    LOG_ROOT = os.path.join(settings['dest_root'], LOG_NAME)
+    log_divider()
+    log_message(f'START {__app__} v{__version__}', display=False, date=True)
+
+    print_intro(verbose)
+    
+    log_message(summarize_settings(settings), display=verbose)
+    
+    group_roots_to_paths(proj_root, settings)
+    
+    if verbose and settings.get('group_paths'):
+        group_paths = ', '.join(settings['group_paths'])
+        log_message(f'Compiled group paths: {group_paths}')
+        
+    if verbose and settings.get('group_roots'):
+        group_roots = ', '.join(settings['group_roots'])
+        log_message(f'Compiled group roots: {group_roots}')
+
+#    traverse(proj_root)
     
     return 0
 
