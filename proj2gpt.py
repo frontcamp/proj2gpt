@@ -357,6 +357,7 @@ def traverse(settings, proj_root):
                 'file_path': op_normjoin(dir_path, e.name),
                 'file_root': op_normjoin(dir_root, e.name),
                 'file_size': file_stats.st_size,
+                'file_hash': None,
                 'is_symlink': e.is_symlink(),
             })
 
