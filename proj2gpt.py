@@ -12,12 +12,24 @@ import os
 import re
 import sys
 import configparser
+import unicodedata
 from datetime import datetime, timezone
+from fnmatch import fnmatch
 from pprint import pprint
+
+#
+# GLOBALS
+#
+
+OS_SEP = os.sep
+DEF_GROUP_PATH = OS_SEP
+DEF_GROUP_NAME = 'context'
 
 #
 # LOGGING
 #
+
+DEBUG = False
 
 LOG_NAME = 'proj2gpt.log'
 LOG_ROOT = os.path.join(os.getcwd(), LOG_NAME)
@@ -63,6 +75,16 @@ def op_absjoin(*paths): return os.path.abspath(op_normjoin(*paths))
 def bool2str(b): return 'Yes' if b else 'No'
 def str2bool(s): return str(s).strip().lower() in ('1', 'true', 'yes', 'on')
 
+def natsort_key(s):
+    parts = re.split(r'(\d+)', s)
+    key = []
+    for p in parts:
+        if p.isdigit():
+            key.append((0, int(p)))
+        else:
+            key.append((1, unicodedata.normalize('NFKD', p).casefold()))
+    return key
+
 #
 # INTRO
 #
@@ -91,6 +113,7 @@ INI_NAME = 'proj2gpt.ini'
 
 DEFAULTS = {
     'SETTINGS': {
+        'debug': '0',    # log debug information
         'verbose': '1',  # show status & progress information
     },
     'PROJECT': {
@@ -103,7 +126,7 @@ DEFAULTS = {
     },
     'TRAVERSAL': {
         'names_allowed': '*.cfg,*.conf,*.css,*.html,*.ini,*.js,*.json,*.md,*.php,*.py,*.txt,*.xml',
-        'names_ignored': '.git*,/logs,/temp,/test',
+        'names_ignored': '.git*,/logs*,/temp*,/test*',
         'use_gitignore': '1',
         'max_file_size': '1000000',
     },
@@ -119,7 +142,9 @@ def _parse_ini_list(s):
     return [x.strip() for x in re.split(r'[,\n]+', s) if x.strip()]
 
 def load_config(proj_root):
-        
+    
+    global DEBUG
+
     ini_path = op_normjoin(proj_root, INI_NAME)
     
     cp = configparser.ConfigParser()
@@ -130,6 +155,7 @@ def load_config(proj_root):
     settings = {}
     settings['project_root'] = proj_root
 
+    settings['debug'] = cp.getboolean('SETTINGS', 'debug')
     settings['verbose'] = cp.getboolean('SETTINGS', 'verbose')
 
     settings['project_title'] = cp.get('PROJECT', 'project_title')
@@ -148,13 +174,17 @@ def load_config(proj_root):
     settings['txt_size_max'] = cp.getint('GENERATOR', 'txt_size_max')
     settings['log_lines_max'] = cp.getint('GENERATOR', 'log_lines_max')
 
+    # set global debug mode
+    DEBUG = settings['debug']
+
     # define destination root folder
     dest_path = op_normpath(settings['dest_path'])
     dest_path_nls = rm_leading_slash(dest_path)
     settings['dest_root'] = op_absjoin(proj_root, dest_path_nls)
 
     # add self files & folders to ignored
-    settings['names_ignored'].append(dest_path)
+    settings['names_ignored'].append(INI_NAME)
+    settings['names_ignored'].append(dest_path + '*')
     settings['names_ignored'].append('*.gpt')
 
     return settings
@@ -228,17 +258,36 @@ def group_roots_to_paths(proj_root, settings):
                 group_paths.append(sub_group_path)
                 paths_seen.add(sub_group_path)
 
-    settings['group_paths'] = sorted(paths_seen)
-    settings['group_roots'] = sorted(roots_seen)
+    settings['group_paths'] = sorted(paths_seen, key=natsort_key)
+    settings['group_roots'] = sorted(roots_seen, key=natsort_key)
 
-def traverse(root: str):
-    root_abs = os.path.abspath(root)
-    res = []
+def gpath_to_fname(group_path):
+    return 'group' + group_path.replace(OS_SEP, '__')
 
-    def rel(p): return os.path.relpath(p, root_abs).replace('\\', '/')
+def traverse(settings, proj_root):
+
+    global DEBUG
+
+    group_paths = settings['group_paths']
+    names_allowed = settings['names_allowed']
+    names_ignored = settings['names_ignored']
+
+    groups = {
+        OS_SEP: {
+            'name': DEF_GROUP_NAME,
+            'files': []
+        },
+    }
+    for gpath in group_paths:
+        groups[gpath] = {
+            'name': gpath_to_fname(gpath),
+            'files': []
+        }
+
+    def rel(p): return os.path.relpath(p, proj_root)
 
     def walk(d_abs: str):
-        d_rel = '' if d_abs == root_abs else rel(d_abs)
+        d_rel = '' if d_abs == proj_root else rel(d_abs)
         d_name = os.path.basename(d_abs)
 
         files, dirs = [], []
@@ -253,8 +302,38 @@ def traverse(root: str):
         dirs.sort(key=lambda e: e.name.lower())
 
         for e in files:
+            
+            fpath = op_normpath(OS_SEP + d_rel)
+            
+            allowed_file = any(fnmatch(e.name, mask) for mask in names_allowed)
+            allowed_path = any(fnmatch(fpath, mask) for mask in names_allowed)
+            
+            ignored_file = any(fnmatch(e.name, mask) for mask in names_ignored)
+            ignored_path = any(fnmatch(fpath, mask) for mask in names_ignored)
+
+            if not allowed_file and not allowed_path:
+                file_path = op_normjoin(d_rel, e.name)
+                if DEBUG:
+                    log_message(f'Notice: Skipped: {file_path}', display=False)
+                continue
+
+            if ignored_file or ignored_path:
+                file_path = op_normjoin(d_rel, e.name)
+                if DEBUG:
+                    log_message(f'Notice: Ignored: {file_path}', display=False)
+                continue
+            
             st = e.stat(follow_symlinks=False)
-            res.append({
+
+            group_path = DEF_GROUP_PATH
+            for gpath in groups:
+                if gpath == DEF_GROUP_PATH:
+                    continue
+                if (OS_SEP + d_rel).startswith(gpath):
+                    group_path = gpath
+                    break
+
+            groups[group_path]['files'].append({
                 'dir_name': d_name,
                 'dir_path': d_rel,
                 'dir_root': d_abs,
@@ -265,18 +344,12 @@ def traverse(root: str):
             })
 
         for sub in dirs:
-            sub_abs = sub.path
-            res.append({
-                'dir_name': sub.name,
-                'dir_path': rel(sub_abs),
-                'dir_root': sub_abs,
-            })
-            walk(sub_abs)
+            walk(sub.path)
 
-    walk(root_abs)
+    walk(proj_root)
     
-    pprint(res, sort_dicts=False)
-    return res
+    pprint(groups)
+    return groups
 
 
 def main():
@@ -306,7 +379,7 @@ def main():
         group_roots = ', '.join(settings['group_roots'])
         log_message(f'Compiled group roots: {group_roots}')
 
-#    traverse(proj_root)
+    traverse(settings, proj_root)
     
     return 0
 
