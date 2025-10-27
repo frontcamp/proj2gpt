@@ -128,18 +128,19 @@ DEFAULTS = {
         'names_allowed': '*.cfg,*.conf,*.css,*.html,*.ini,*.js,*.json,*.md,*.php,*.py,*.txt,*.xml',
         'names_ignored': '.git*,/logs*,/temp*,/test*',
         'use_gitignore': '1',
-        'max_file_size': '1000000',
+        'max_file_size': '1000000',  # bytes
     },
     'GENERATOR': {
         'dest_path': '/proj2gpt',
-        'txt_size_max': '3000000',
-        'log_lines_max': '3000', 
+        'max_text_size': '3000000',  # bytes
+        'max_log_lines': '3000', 
     },
 }
 
 def _parse_ini_list(s):
     s = (s or '').strip()
-    return [x.strip() for x in re.split(r'[,\n]+', s) if x.strip()]
+    items = [x.strip() for x in re.split(r'[,\n]+', s) if x.strip()]
+    return [op_normpath(x) for x in items]
 
 def load_config(proj_root):
     
@@ -171,8 +172,8 @@ def load_config(proj_root):
     settings['max_file_size'] = cp.getint('TRAVERSAL', 'max_file_size')
 
     settings['dest_path'] = cp.get('GENERATOR', 'dest_path').strip()
-    settings['txt_size_max'] = cp.getint('GENERATOR', 'txt_size_max')
-    settings['log_lines_max'] = cp.getint('GENERATOR', 'log_lines_max')
+    settings['max_text_size'] = cp.getint('GENERATOR', 'max_text_size')
+    settings['max_log_lines'] = cp.getint('GENERATOR', 'max_log_lines')
 
     # set global debug mode
     DEBUG = settings['debug']
@@ -205,8 +206,8 @@ def summarize_settings(settings):
         ' [T] max_file_size: %s' % settings['max_file_size'],
         ' [G] dest_path: %s' % (settings['dest_path'])  ,
         ' [G] dest_root: %s' % (settings['dest_root'])  ,
-        ' [G] txt_size_max: %s' % settings['txt_size_max'],
-        ' [G] log_lines_max: %s' % settings['log_lines_max'],
+        ' [G] max_text_size: %s' % settings['max_text_size'],
+        ' [G] max_log_lines: %s' % settings['max_log_lines'],
     ]
     return '\n'.join(lines)
 
@@ -272,26 +273,26 @@ def traverse(settings, proj_root):
     names_allowed = settings['names_allowed']
     names_ignored = settings['names_ignored']
 
-    groups = {
+    groups = {                    # 1st (root) group
         OS_SEP: {
             'name': DEF_GROUP_NAME,
             'files': []
         },
     }
-    for gpath in group_paths:
+    for gpath in group_paths:     # other groups
         groups[gpath] = {
             'name': gpath_to_fname(gpath),
             'files': []
         }
 
-    def rel(p): return os.path.relpath(p, proj_root)
+    def rel_to_root(dir_root): return os.path.relpath(dir_root, proj_root)
 
-    def walk(d_abs: str):
-        d_rel = '' if d_abs == proj_root else rel(d_abs)
-        d_name = os.path.basename(d_abs)
+    def walk(dir_root: str):
+        dir_path = '' if dir_root == proj_root else rel_to_root(dir_root)
+        dir_name = os.path.basename(dir_root)
 
         files, dirs = [], []
-        with os.scandir(d_abs) as it:
+        with os.scandir(dir_root) as it:
             for e in it:
                 if e.is_file(follow_symlinks=False):
                     files.append(e)
@@ -303,7 +304,10 @@ def traverse(settings, proj_root):
 
         for e in files:
             
-            fpath = op_normpath(OS_SEP + d_rel)
+            fpath = op_normpath(OS_SEP + dir_path)
+            
+            #
+            # filter
             
             allowed_file = any(fnmatch(e.name, mask) for mask in names_allowed)
             allowed_path = any(fnmatch(fpath, mask) for mask in names_allowed)
@@ -312,34 +316,47 @@ def traverse(settings, proj_root):
             ignored_path = any(fnmatch(fpath, mask) for mask in names_ignored)
 
             if not allowed_file and not allowed_path:
-                file_path = op_normjoin(d_rel, e.name)
+                file_path = op_normjoin(dir_path, e.name)
                 if DEBUG:
                     log_message(f'Notice: Skipped: {file_path}', display=False)
                 continue
 
             if ignored_file or ignored_path:
-                file_path = op_normjoin(d_rel, e.name)
+                file_path = op_normjoin(dir_path, e.name)
                 if DEBUG:
                     log_message(f'Notice: Ignored: {file_path}', display=False)
                 continue
             
-            st = e.stat(follow_symlinks=False)
-
+            #
+            # define group
+            
             group_path = DEF_GROUP_PATH
             for gpath in groups:
                 if gpath == DEF_GROUP_PATH:
                     continue
-                if (OS_SEP + d_rel).startswith(gpath):
+                if (OS_SEP + dir_path).startswith(gpath):
                     group_path = gpath
                     break
 
+            #
+            # collect data
+
+            file_stem, file_ext = os.path.splitext(e.name)
+            if file_ext.startswith('.'):
+                file_ext = file_ext[1:]
+
+            file_stats = e.stat(follow_symlinks=False)
+
             groups[group_path]['files'].append({
-                'dir_name': d_name,
-                'dir_path': d_rel,
-                'dir_root': d_abs,
+                'dir_name': dir_name,
+                'dir_path': dir_path,
+                'dir_root': dir_root,
                 'file_name': e.name,
-                'file_path': d_rel,
-                'file_size': st.st_size,
+                'file_stem': file_stem,
+                'file_ext': file_ext,
+                'file_path': op_normjoin(dir_path, e.name),
+                'file_root': op_normjoin(dir_root, e.name),
+                'file_size': file_stats.st_size,
                 'is_symlink': e.is_symlink(),
             })
 
@@ -347,9 +364,55 @@ def traverse(settings, proj_root):
             walk(sub.path)
 
     walk(proj_root)
-    
-    pprint(groups)
     return groups
+
+def groups_limiter(groups, settings):
+    
+    new_groups = dict()
+    
+    def add_new_group(path, name, files, chunk_num):
+        if chunk_num > 0:
+            path += ' (' + str(chunk_num) + ')'
+            name += '_' + str(chunk_num).zfill(2)
+        new_groups[path] = {'name': name, 'files': files}
+    
+    for group_path, group_data in groups.items():
+
+        group_name = group_data['name']
+        
+        chunk_size = 0
+        chunk_num = 0
+        chunk_files = []
+        
+        for file_data in group_data['files']:
+    
+            file_size = file_data['file_size']
+            file_path = file_data['file_path']
+
+            if (file_size > settings['max_file_size']
+             or file_size > settings['max_text_size']):
+                if DEBUG:
+                    log_message(f'Notice: Skipped by size ({file_size}), file {file_path}', display=False)
+                continue
+
+            if chunk_size > 0 and chunk_size + file_size > settings['max_text_size']:
+                
+                # create new group chunk
+                chunk_size = 0    # reset
+                chunk_num += 1    # inc
+                add_new_group(group_path, group_name, chunk_files, chunk_num)
+                chunk_files = []  # reset
+
+            chunk_size += file_size
+            chunk_files.append(file_data)
+
+        if chunk_files:
+            if chunk_num > 0:  # the last chunk in the series
+                chunk_num += 1
+            add_new_group(group_path, group_name, chunk_files, chunk_num)
+    
+    pprint(new_groups)
+    return new_groups
 
 
 def main():
@@ -379,8 +442,9 @@ def main():
         group_roots = ', '.join(settings['group_roots'])
         log_message(f'Compiled group roots: {group_roots}')
 
-    traverse(settings, proj_root)
-    
+    groups = traverse(settings, proj_root)
+    groups = groups_limiter(groups, settings)
+
     return 0
 
 
