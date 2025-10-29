@@ -3,9 +3,11 @@ TODO
 ----
 
 - instructions.txt (project description to AI model)
+- calc diff, show & write to diff.txt
 - merge names_ignored with .gitignore (if enabled & file exists)
 - add to documentation note about symlink ignoring
 - add old builds autodeletion (by age or quantity)
+- limit log size by number of lines
 - unit tests (long strings, non-unicode, exceptions, etc)
 
 DONE
