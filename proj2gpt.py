@@ -3,7 +3,8 @@
 # Naming convention:
 #   UPPER_CASE - constants
 #   lower_case - variables
-#   *_file - file name
+#   *_file - file handler
+#   *_name - file or folder name
 #   *_path - relative path to file or folder
 #   *_root - absolute path to file or folder
 #   *_nls - no leading slash
@@ -13,6 +14,7 @@ import re
 import sys
 import configparser
 import unicodedata
+import hashlib
 from datetime import datetime, timezone
 from fnmatch import fnmatch
 from pprint import pprint
@@ -110,6 +112,7 @@ def print_intro(verbose):
 #
 
 INI_NAME = 'proj2gpt.ini'
+TOC_NAME = 'toc.txt'
 
 DEFAULTS = {
     'SETTINGS': {
@@ -143,7 +146,7 @@ def _parse_ini_list(s):
     return [op_normpath(x) for x in items]
 
 def load_config(proj_root):
-    
+
     global DEBUG
 
     ini_path = op_normjoin(proj_root, INI_NAME)
@@ -171,21 +174,25 @@ def load_config(proj_root):
     settings['use_gitignore'] = cp.getboolean('TRAVERSAL', 'use_gitignore')
     settings['max_file_size'] = cp.getint('TRAVERSAL', 'max_file_size')
 
-    settings['dest_path'] = cp.get('GENERATOR', 'dest_path').strip()
+    settings['dest_path'] = op_normpath(cp.get('GENERATOR', 'dest_path').strip())
     settings['max_text_size'] = cp.getint('GENERATOR', 'max_text_size')
     settings['max_log_lines'] = cp.getint('GENERATOR', 'max_log_lines')
 
     # set global debug mode
     DEBUG = settings['debug']
 
-    # define destination root folder
-    dest_path = op_normpath(settings['dest_path'])
-    dest_path_nls = rm_leading_slash(dest_path)
+    # define destination folder
+    dest_path_nls = rm_leading_slash(settings['dest_path'])
     settings['dest_root'] = op_absjoin(proj_root, dest_path_nls)
+
+    # define context folder
+    settings['context_name'] = datetime.now(timezone.utc).strftime('%Y%m%d-%H%M%S')
+    settings['context_path'] = op_normjoin(settings['dest_path'], settings['context_name'])
+    settings['context_root'] = op_normjoin(settings['dest_root'], settings['context_name'])
 
     # add self files & folders to ignored
     settings['names_ignored'].append(INI_NAME)
-    settings['names_ignored'].append(dest_path + '*')
+    settings['names_ignored'].append(settings['dest_path'] + '*')
     settings['names_ignored'].append('*.gpt')
 
     return settings
@@ -204,8 +211,11 @@ def summarize_settings(settings):
         ' [T] names_ignored: %s' % (', '.join(settings['names_ignored']) if settings['names_ignored'] else '<none>'),
         ' [T] use_gitignore: %s' % bool2str(settings['use_gitignore']),
         ' [T] max_file_size: %s' % settings['max_file_size'],
-        ' [G] dest_path: %s' % (settings['dest_path'])  ,
-        ' [G] dest_root: %s' % (settings['dest_root'])  ,
+        ' [G] dest_path: %s' % (settings['dest_path']),
+        ' [G] dest_root: %s' % (settings['dest_root']),
+        ' [G] context_name: %s' % (settings['context_name']),
+        ' [G] context_path: %s' % (settings['context_path']),
+        ' [G] context_root: %s' % (settings['context_root']),
         ' [G] max_text_size: %s' % settings['max_text_size'],
         ' [G] max_log_lines: %s' % settings['max_log_lines'],
     ]
@@ -216,7 +226,7 @@ def summarize_settings(settings):
 #
 
 def group_roots_to_paths(proj_root, settings):
-    
+
     group_paths = settings['group_paths']  # [] - relative paths list
     paths_seen = set()
 
@@ -318,13 +328,13 @@ def traverse(settings, proj_root):
             if not allowed_file and not allowed_path:
                 file_path = op_normjoin(dir_path, e.name)
                 if DEBUG:
-                    log_message(f'Notice: Skipped: {file_path}', display=False)
+                    log_message(f'Notice: Skipped: {OS_SEP}{file_path}', display=False)
                 continue
 
             if ignored_file or ignored_path:
                 file_path = op_normjoin(dir_path, e.name)
                 if DEBUG:
-                    log_message(f'Notice: Ignored: {file_path}', display=False)
+                    log_message(f'Notice: Ignored: {OS_SEP}{file_path}', display=False)
                 continue
             
             #
@@ -368,9 +378,9 @@ def traverse(settings, proj_root):
     return groups
 
 def groups_limiter(groups, settings):
-    
+
     new_groups = dict()
-    
+
     def add_new_group(path, name, files, chunk_num):
         if chunk_num > 0:
             path += ' (' + str(chunk_num) + ')'
@@ -380,24 +390,24 @@ def groups_limiter(groups, settings):
     for group_path, group_data in groups.items():
 
         group_name = group_data['name']
-        
+
         chunk_size = 0
         chunk_num = 0
         chunk_files = []
-        
+
         for file_data in group_data['files']:
-    
+
             file_size = file_data['file_size']
             file_path = file_data['file_path']
 
             if (file_size > settings['max_file_size']
              or file_size > settings['max_text_size']):
                 if DEBUG:
-                    log_message(f'Notice: Skipped by size ({file_size}), file {file_path}', display=False)
+                    log_message(f'Notice: Skipped by size ({file_size}), file {OS_SEP}{file_path}', display=False)
                 continue
 
             if chunk_size > 0 and chunk_size + file_size > settings['max_text_size']:
-                
+
                 # create new group chunk
                 chunk_size = 0    # reset
                 chunk_num += 1    # inc
@@ -411,10 +421,101 @@ def groups_limiter(groups, settings):
             if chunk_num > 0:  # the last chunk in the series
                 chunk_num += 1
             add_new_group(group_path, group_name, chunk_files, chunk_num)
-    
-    pprint(new_groups)
+
+    #pprint(new_groups)
     return new_groups
 
+#
+# GENERATING OUTPUT
+#
+
+def sha256_10(text):
+    return hashlib.sha256(text.encode('utf-8')).hexdigest()[:10]
+
+def generate_containers(groups, settings):
+
+    context_path = settings['context_path']
+    context_root = settings['context_root']
+    os.makedirs(context_root, exist_ok=True)
+    global_toc = ''
+
+    for group_path, group_data in groups.items():
+
+        container_name = group_data['name'] + '.txt'
+        container_path = op_normjoin(context_path, container_name)
+        container_root = op_normjoin(context_root, container_name)
+
+        container_toc = f'GROUP: "{group_path}" (CONTAINER: "{container_path}")\n'
+        container_txt = ''
+        container_ofs = 0
+
+        group_file = open(container_root,
+                         mode='w',
+                         encoding='utf-8',
+                         buffering=64*1024,
+                         newline='\n')
+
+        for file_data in group_data['files']:
+
+            stub_name = file_data['file_stem'] + '.gpt'
+            stub_root = op_normjoin(file_data['dir_root'], stub_name)
+            stub_exists = os.path.isfile(stub_root) and os.access(stub_root, os.R_OK)
+
+            file_root = file_data['file_root']
+
+            srce_root = stub_root if stub_exists else file_root
+
+            # read file content, decode as UTF-8
+
+            srce_file = open(srce_root, 'rb')
+            try:
+                file_content = srce_file.read().decode('utf-8', errors='strict')
+            except OSError as e:
+                log_message(f'I/O error {srce_root}: {e}', display=False)
+                file_content = '[## ERROR: FILE CANNOT BE READ DUE TO I/O ERROR! ##]'
+            except UnicodeDecodeError as e:
+                log_message(f'Decode error in {srce_root}: {e}', display=False)
+                file_content = '[## ERROR: FILE CANNOT BE READ DUE TO UNICODE DECODING ERROR! ##]'
+            finally:
+                srce_file.close()
+
+            # normalize line breaks
+
+            file_content = file_content.replace('\r\n','\n').replace('\r','\n')
+            if not file_content:
+                file_content = '[## NOTE: EMPTY FILE ##]'
+
+            # add content frames
+
+            hash10 = sha256_10(file_content)
+            head = f'[## BEGIN FILE: "{OS_SEP}{file_data["file_path"]}" ##]\n'
+            foot = f'\n[## END FILE: "{OS_SEP}{file_data["file_path"]}" ##]\n'
+            file_content = head + file_content + foot
+
+            f_size = len(file_content.encode('utf-8'))
+            container_toc += f'\tFILE: "{OS_SEP}{file_data["file_path"]}"; OFFSET: {container_ofs}; SIZE: {f_size}; HASH: {hash10} \n'
+            container_ofs += f_size
+
+            container_txt += file_content
+
+        global_toc += container_toc
+
+        group_file.write(container_txt)
+        group_file.close()
+
+    # write global TOC
+
+    global_toc = '[## CONTENTS ##]\n' + global_toc
+    toc_root = op_normjoin(settings['context_root'], TOC_NAME)
+    with open(toc_root, 'w', encoding='utf-8', newline='\n') as toc_file:
+        toc_file.write(global_toc)
+
+def generate_instructions(groups):
+    pass
+
+#
+# MAIN
+#
 
 def main():
     global LOG_ROOT
@@ -430,21 +531,28 @@ def main():
     log_message(f'START {__app__} v{__version__}', display=False, date=True)
 
     print_intro(verbose)
-    
+
     log_message(summarize_settings(settings), display=verbose)
-    
+
     group_roots_to_paths(proj_root, settings)
-    
+
     if verbose and settings.get('group_paths'):
         group_paths = ', '.join(settings['group_paths'])
         log_message(f'Compiled group paths: {group_paths}')
-        
+
     if verbose and settings.get('group_roots'):
         group_roots = ', '.join(settings['group_roots'])
         log_message(f'Compiled group roots: {group_roots}')
 
+    # collecting data
+
     groups = traverse(settings, proj_root)
     groups = groups_limiter(groups, settings)
+
+    # generating output
+
+    generate_containers(groups, settings)
+    generate_instructions(groups)
 
     return 0
 

@@ -1,29 +1,29 @@
 
-
 TODO
-====
+----
 
-
-- merge names_ignored with .gitignore (if enabled & file exists)
-- add destination folder to ignored
-- write a recursive directory traversal
-- sort files & folders alphabetically with natural number order
-  process files first, then sub-folders
-- generating TXT containers respecting max_size, chunks
-  handle exceptions (symlinks, rights)
-  UTF-8 -> detect -> recoding to UTF-8
-  CRLF normalizing
-  add file path, size, hash
-  replace/skip secrets
-- TOC at the beginning of each TXT container
-- general INDEX file
 - instructions.txt (project description to AI model)
-- on-screen reporting, logging
+- merge names_ignored with .gitignore (if enabled & file exists)
 - add to documentation note about symlink ignoring
-
+- add old builds autodeletion (by age or quantity)
+- unit tests (long strings, non-unicode, exceptions, etc)
 
 DONE
-====
+----
 
-
++ check long line reading
++ check 0-byte files processing (insert <empty file> placeholder)
++ local in-container TOC & global TOC
++ generating TXT containers respecting max_size, chunks
+  + replace/skip secrets {name}.gpt
+  + handle exceptions (symlinks, rights)
+  + UTF-8 -> detect -> recoding to UTF-8
+  + CRLF normalizing
+  + calc hash: SHA-256 for normalized text
+  + add file path, size, hash
++ sort files & folders alphabetically with natural number order
+  process files first, then sub-folders
++ on-screen reporting, logging
++ write a recursive directory traversal
++ add destination folder to ignored
 + reading & output configuration
