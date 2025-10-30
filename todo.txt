@@ -3,11 +3,13 @@ TODO
 ----
 
 - before close show run summary
+- write function for existing builds reading
+- add old builds autodeletion (by quantity)
+- write function to parse TOC file
 - write documentation
 - add to documentation note about symlink ignoring
 - calc diff, show & write to diff.txt
 - merge names_ignored with .gitignore (if enabled & file exists), recursively
-- add old builds autodeletion (by age or quantity)
 - limit log size by number of lines
 - unit tests (long strings, non-unicode, exceptions, etc)
 
