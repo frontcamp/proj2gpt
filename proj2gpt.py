@@ -448,7 +448,7 @@ def generate_containers(groups, settings):
         container_path = op_normjoin(context_path, container_name)
         container_root = op_normjoin(context_root, container_name)
 
-        container_toc = f'\nGROUP ORIG_PATH: "{group_path}"; CONTAINER: "{container_name}")\n'
+        container_toc = f'\nGROUP ORIG_PATH: "{group_path}"; CONTAINER: "{container_name}"\n'
         container_txt = ''
         container_ofs = 0
 
@@ -508,7 +508,7 @@ def generate_containers(groups, settings):
 
     # write global TOC
 
-    global_toc_title = f'TOC BUIlD: {context_name}\n'
+    global_toc_title = f'TOC BUILD: {context_name}\n'
     global_toc = global_toc_title + global_toc
     
     toc_root = op_normjoin(settings['context_root'], TOC_NAME)
