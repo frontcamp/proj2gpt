@@ -722,7 +722,11 @@ def main():
     generate_containers(groups, settings)
     generate_instructions(groups, settings)
 
-    # delete old builds
+    # calc diff
+
+    # ...
+
+    # clean up
 
     cleanup_builds(settings)
     cleanup_log(settings)
