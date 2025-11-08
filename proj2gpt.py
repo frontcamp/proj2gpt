@@ -9,12 +9,13 @@
 #   *_root - absolute path to file or folder
 #   *_nls - no leading slash
 
+import configparser
+import hashlib
 import os
 import re
+import shutil
 import sys
-import configparser
 import unicodedata
-import hashlib
 from datetime import datetime, timezone
 from fnmatch import fnmatch
 from textwrap import dedent
@@ -131,6 +132,7 @@ DEFAULTS = {
     'SETTINGS': {
         'debug': '0',    # log debug information
         'verbose': '1',  # show status & progress information
+        'build_keep_count': '0',  # how many builds to keep, 0 - unlim
     },
     'PROJECT': {
         'project_title': 'Common',
@@ -138,7 +140,6 @@ DEFAULTS = {
         'group_paths': '',    # <group_path1>[, <group_path2> ...]
         'group_roots': '',    # <group_root1>[, <group_root2> ...]
         'secrets_auto': '1',  # auto replace everything to <name>.gpt
-        'secrets_list': '',   # <secret_path>@<dummy_filename>[, ...]
     },
     'TRAVERSAL': {
         'names_allowed': '*.cfg,*.conf,*.css,*.html,*.ini,*.js,*.json,*.md,*.php,*.py,*.txt,*.xml',
@@ -174,13 +175,13 @@ def load_config(proj_root):
 
     settings['debug'] = cp.getboolean('SETTINGS', 'debug')
     settings['verbose'] = cp.getboolean('SETTINGS', 'verbose')
+    settings['build_keep_count'] = cp.getint('SETTINGS', 'build_keep_count')
 
     settings['project_title'] = cp.get('PROJECT', 'project_title')
     settings['project_descr'] = cp.get('PROJECT', 'project_descr')
     settings['group_paths'] = _parse_ini_list(cp.get('PROJECT', 'group_paths'))
     settings['group_roots'] = _parse_ini_list(cp.get('PROJECT', 'group_roots'))
     settings['secrets_auto'] = cp.getboolean('PROJECT', 'secrets_auto')
-    settings['secrets_list'] = _parse_ini_list(cp.get('PROJECT', 'secrets_list'))
 
     settings['names_allowed'] = _parse_ini_list(cp.get('TRAVERSAL', 'names_allowed'))
     settings['names_ignored'] = _parse_ini_list(cp.get('TRAVERSAL', 'names_ignored'))
@@ -219,7 +220,6 @@ def summarize_settings(settings):
         ' [P] group_paths: %s' % (', '.join(settings['group_paths']) if settings['group_paths'] else '<none>'),
         ' [P] group_roots: %s' % (', '.join(settings['group_roots']) if settings['group_roots'] else '<none>'),
         ' [P] secrets_auto: %s' % bool2str(settings['secrets_auto']),
-        ' [P] secrets_list: %s' % (', '.join(settings['secrets_list']) if settings['secrets_list'] else '<none>'),
         ' [T] names_allowed: %s' % (', '.join(settings['names_allowed']) if settings['names_allowed'] else '<none>'),
         ' [T] names_ignored: %s' % (', '.join(settings['names_ignored']) if settings['names_ignored'] else '<none>'),
         ' [T] use_gitignore: %s' % bool2str(settings['use_gitignore']),
@@ -571,6 +571,25 @@ def generate_instructions(groups, settings):
 
     log_message(f'Created: {INS_NAME}')
 
+def cleanup_builds(settings):
+
+    build_keep_count = settings['build_keep_count']
+    build_names = list_dirs(settings['dest_root'])
+
+    if (not build_names          # nothing to delete
+     or build_keep_count <= 0):  # unlimited
+         return
+
+    i = 0
+    for build_name in build_names:
+
+        i += 1
+        build_root = op_normjoin(settings['dest_root'], build_name)
+        if (i > build_keep_count         # build is redundant
+        and os.path.isdir(build_root)):  # is dir
+            shutil.rmtree(build_root)
+            log_message(f'Removed: /{build_name}')
+
 #
 # MAIN
 #
@@ -612,9 +631,10 @@ def main():
     generate_containers(groups, settings)
     generate_instructions(groups, settings)
 
-    dnames = list_dir_names(settings['dest_root'])
-    pprint(dnames)
+    # delete old builds
 
+    cleanup_builds(settings)
+    
     return 0
 
 

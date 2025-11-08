@@ -2,7 +2,6 @@
 TODO
 ----
 
-- add old builds autodeletion (by quantity)
 - write function to parse TOC file
 - write documentation
 - add to documentation note about symlink ignoring
@@ -14,6 +13,7 @@ TODO
 DONE
 ----
 
++ add old builds autodeletion (by quantity)
 + write function for existing builds reading: list_dirs()
 + before close show run summary
 + instructions.txt (project description to AI model)
