@@ -2,7 +2,6 @@
 TODO
 ----
 
-- write function for existing builds reading
 - add old builds autodeletion (by quantity)
 - write function to parse TOC file
 - write documentation
@@ -15,6 +14,7 @@ TODO
 DONE
 ----
 
++ write function for existing builds reading: list_dirs()
 + before close show run summary
 + instructions.txt (project description to AI model)
 + check long line reading

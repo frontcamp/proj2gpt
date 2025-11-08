@@ -88,6 +88,17 @@ def natsort_key(s):
             key.append((1, unicodedata.normalize('NFKD', p).casefold()))
     return key
 
+def list_dirs(path):
+    """Return a list of subfolder names in the given path."""
+    try:
+        dirs = [
+            name for name in os.listdir(path)
+            if os.path.isdir(os.path.join(path, name))
+        ]
+        return sorted(dirs, reverse=True)
+    except OSError:
+        return []
+
 #
 # INTRO
 #
@@ -600,6 +611,9 @@ def main():
 
     generate_containers(groups, settings)
     generate_instructions(groups, settings)
+
+    dnames = list_dir_names(settings['dest_root'])
+    pprint(dnames)
 
     return 0
 
