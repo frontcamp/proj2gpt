@@ -4,7 +4,6 @@ TODO
 
 - write function to parse TOC file
 - calc diff, show & write to diff.txt
-- merge names_ignored with .gitignore (if enabled & file exists), recursively
 - write documentation
 - add to documentation note about symlink ignoring
 - unit tests (long strings, non-unicode, exceptions, etc)
@@ -12,6 +11,7 @@ TODO
 DONE
 ----
 
++ recursively respect .gitignore (if enabled & file exists)
 + add rewrite log flag & functionality
 + limit log size by number of lines
 + add old builds autodeletion (by quantity)

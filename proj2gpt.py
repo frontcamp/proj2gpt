@@ -101,6 +101,31 @@ def list_dirs(path):
     except OSError:
         return []
 
+def gitignore2masks(dir_root, dir_path):
+    file_root = op_normjoin(dir_root, '.gitignore')
+    masks = []
+    if not os.path.isfile(file_root):
+        return masks
+
+    with open(file_root, encoding="utf-8") as git_file:
+        for line in git_file:
+            mask = line.strip()
+            if not mask or mask.startswith("#"):
+                continue
+
+            if mask.startswith(('/', '\\')):  # anchored mask (rel. to this .gitignore dir)
+                mask = rm_leading_slash(mask)
+                if dir_path:
+                    full = op_normjoin(OS_SEP + dir_path, mask)
+                else:
+                    full = OS_SEP + mask
+            else:                             # non-anchored mask
+                full = mask
+
+            masks.append(op_normpath(full))
+
+    return masks
+
 #
 # INTRO
 #
@@ -166,7 +191,7 @@ def load_config(proj_root):
     global DEBUG, LOG_ROOT
 
     ini_path = op_normjoin(proj_root, INI_NAME)
-    
+
     cp = configparser.ConfigParser()
     cp.read_dict(DEFAULTS)
     if os.path.isfile(ini_path):
@@ -329,49 +354,54 @@ def traverse(settings, proj_root):
 
     def rel_to_root(dir_root): return os.path.relpath(dir_root, proj_root)
 
-    def walk(dir_root: str):
+    def walk(dir_root: str, _parent_git_masks=[]):
         dir_path = '' if dir_root == proj_root else rel_to_root(dir_root)
         dir_name = os.path.basename(dir_root)
 
         files, dirs = [], []
-        with os.scandir(dir_root) as it:
-            for e in it:
-                if e.is_file(follow_symlinks=False):
-                    files.append(e)
-                elif e.is_dir(follow_symlinks=False):
-                    dirs.append(e)
+        with os.scandir(dir_root) as dir_items:
+            for dir_item in dir_items:
+                if dir_item.is_file(follow_symlinks=False):
+                    files.append(dir_item)
+                elif dir_item.is_dir(follow_symlinks=False):
+                    dirs.append(dir_item)
 
         files.sort(key=lambda e: e.name.lower())
         dirs.sort(key=lambda e: e.name.lower())
 
+        gmasks = gitignore2masks(dir_root, dir_path)
+        local_git = gmasks if settings['use_gitignore'] else []
+        names_ignored_git = _parent_git_masks + local_git
+        names_ignored_full = names_ignored + names_ignored_git
+
         for e in files:
-            
-            fpath = op_normpath(OS_SEP + dir_path)
-            
+
+            fpath = op_normjoin(OS_SEP + dir_path, e.name)
+
             #
             # filter
-            
+
             allowed_file = any(fnmatch(e.name, mask) for mask in names_allowed)
             allowed_path = any(fnmatch(fpath, mask) for mask in names_allowed)
-            
-            ignored_file = any(fnmatch(e.name, mask) for mask in names_ignored)
-            ignored_path = any(fnmatch(fpath, mask) for mask in names_ignored)
+
+            ignored_file = any(fnmatch(e.name, mask) for mask in names_ignored_full)
+            ignored_path = any(fnmatch(fpath, mask) for mask in names_ignored_full)
 
             if not allowed_file and not allowed_path:
                 file_path = op_normjoin(dir_path, e.name)
                 if DEBUG:
-                    log_message(f'Notice: Skipped: {OS_SEP}{file_path}', display=False)
+                    log_message(f'Skipped: {OS_SEP}{file_path}', display=False)
                 continue
 
             if ignored_file or ignored_path:
                 file_path = op_normjoin(dir_path, e.name)
                 if DEBUG:
-                    log_message(f'Notice: Ignored: {OS_SEP}{file_path}', display=False)
+                    log_message(f'Ignored: {OS_SEP}{file_path}', display=False)
                 continue
-            
+
             #
             # define group
-            
+
             group_path = DEF_GROUP_PATH
             for gpath in groups:
                 if gpath == DEF_GROUP_PATH:
@@ -403,8 +433,18 @@ def traverse(settings, proj_root):
                 'is_symlink': e.is_symlink(),
             })
 
-        for sub in dirs:
-            walk(sub.path)
+        for d in dirs:
+
+            dpath = op_normjoin(OS_SEP + dir_path, d.name)
+            ignored_name = any(fnmatch(d.name, mask) for mask in names_ignored_full)
+            ignored_path = any(fnmatch(dpath, mask) for mask in names_ignored_full)
+
+            if ignored_name or ignored_path:
+                if DEBUG:
+                    log_message(f'Ignored: {dpath}', display=False)
+                continue
+
+            walk(d.path, names_ignored_git)
 
     walk(proj_root)
     return groups
@@ -418,7 +458,7 @@ def groups_limiter(groups, settings):
             path += ' (' + str(chunk_num) + ')'
             name += '__' + str(chunk_num).zfill(2)
         new_groups[path] = {'name': name, 'files': files}
-    
+
     for group_path, group_data in groups.items():
 
         group_name = group_data['name']
@@ -535,14 +575,14 @@ def generate_containers(groups, settings):
 
         group_file.write(container_txt)
         group_file.close()
-        
+
         log_message(f'Created: {container_name}')
-        
+
     # write global TOC
 
     global_toc_title = f'TOC BUILD: {context_name}\n'
     global_toc = global_toc_title + global_toc
-    
+
     toc_root = op_normjoin(settings['context_root'], TOC_NAME)
     with open(toc_root, 'w', encoding='utf-8', newline='\n') as toc_file:
         toc_file.write(global_toc)
@@ -550,7 +590,7 @@ def generate_containers(groups, settings):
     log_message(f'Created: {TOC_NAME}')
 
 def generate_instructions(groups, settings):
-    
+
     s = dedent("""
         [TASK]
         You are helping to work on the project: {%PROJ_TITLE%}
@@ -580,7 +620,7 @@ def generate_instructions(groups, settings):
         In responses, explicitly refer to the project paths and files to simplify navigation.
         If the context is insufficient, specify which files/fragments are missing and stop; do not invent.
         """)
-        
+
     s = s.replace('{%PROJ_TITLE%}', settings['project_title'])
     s = s.replace('{%PROJ_DESCR%}', settings['project_descr'])
 
@@ -619,7 +659,7 @@ def cleanup_log(settings):
     log_rewrite = settings['log_rewrite']
     if log_rewrite:
         max_lines = sys.maxsize
-    
+
     if max_lines <= 0:
         return
     if not os.path.isfile(LOG_ROOT):
@@ -686,7 +726,7 @@ def main():
 
     cleanup_builds(settings)
     cleanup_log(settings)
-    
+
     return 0
 
 if __name__ == '__main__':
