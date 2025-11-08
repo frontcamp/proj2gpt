@@ -12,6 +12,7 @@ TODO
 DONE
 ----
 
++ add rewrite log flag & functionality
 + limit log size by number of lines
 + add old builds autodeletion (by quantity)
 + write function for existing builds reading: list_dirs()

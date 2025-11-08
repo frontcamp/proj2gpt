@@ -133,11 +133,12 @@ DEFAULTS = {
     'SETTINGS': {
         'debug': '0',    # log debug information
         'verbose': '1',  # show status & progress information
-        'build_keep_count': '0',  # how many builds to keep, 0 - unlim
+        'build_keep_count': '0',  # how many builds to keep, 0 = unlimited
+        'log_rewrite': '0',       # start a new log each run; True disables max_log_lines
     },
     'PROJECT': {
         'project_title': 'Common',
-        'project_descr': 'Working over the project',
+        'project_descr': 'Working on the project',
         'group_paths': '',    # <group_path1>[, <group_path2> ...]
         'group_roots': '',    # <group_root1>[, <group_root2> ...]
         'secrets_auto': '1',  # auto replace everything to <name>.gpt
@@ -151,7 +152,7 @@ DEFAULTS = {
     'GENERATOR': {
         'dest_path': '/proj2gpt',
         'max_text_size': '3000000',  # bytes
-        'max_log_lines': '10000', 
+        'max_log_lines': '20000',
     },
 }
 
@@ -162,7 +163,7 @@ def _parse_ini_list(s):
 
 def load_config(proj_root):
 
-    global DEBUG
+    global DEBUG, LOG_ROOT
 
     ini_path = op_normjoin(proj_root, INI_NAME)
     
@@ -174,21 +175,26 @@ def load_config(proj_root):
     settings = {}
     settings['project_root'] = proj_root
 
+    # SETTINGS
     settings['debug'] = cp.getboolean('SETTINGS', 'debug')
     settings['verbose'] = cp.getboolean('SETTINGS', 'verbose')
     settings['build_keep_count'] = cp.getint('SETTINGS', 'build_keep_count')
+    settings['log_rewrite'] = cp.getboolean('SETTINGS', 'log_rewrite')
 
+    # PROJECT
     settings['project_title'] = cp.get('PROJECT', 'project_title')
     settings['project_descr'] = cp.get('PROJECT', 'project_descr')
     settings['group_paths'] = _parse_ini_list(cp.get('PROJECT', 'group_paths'))
     settings['group_roots'] = _parse_ini_list(cp.get('PROJECT', 'group_roots'))
     settings['secrets_auto'] = cp.getboolean('PROJECT', 'secrets_auto')
 
+    # TRAVERSAL
     settings['names_allowed'] = _parse_ini_list(cp.get('TRAVERSAL', 'names_allowed'))
     settings['names_ignored'] = _parse_ini_list(cp.get('TRAVERSAL', 'names_ignored'))
     settings['use_gitignore'] = cp.getboolean('TRAVERSAL', 'use_gitignore')
     settings['max_file_size'] = cp.getint('TRAVERSAL', 'max_file_size')
 
+    # GENERATOR
     settings['dest_path'] = op_normpath(cp.get('GENERATOR', 'dest_path').strip())
     settings['max_text_size'] = cp.getint('GENERATOR', 'max_text_size')
     settings['max_log_lines'] = cp.getint('GENERATOR', 'max_log_lines')
@@ -210,11 +216,23 @@ def load_config(proj_root):
     settings['names_ignored'].append(settings['dest_path'] + '*')
     settings['names_ignored'].append('*.gpt')
 
+    # set log root to destination folder
+    LOG_ROOT = os.path.join(settings['dest_root'], LOG_NAME)
+
+    # delete old log if log_rewrite == True
+    if settings['log_rewrite'] and os.path.isfile(LOG_ROOT):
+        os.remove(LOG_ROOT)
+
     return settings
 
 def summarize_settings(settings):
+
     lines = [
         'SETTINGS:',
+        ' [S] debug: %s' % bool2str(settings['debug']),
+        ' [S] verbose: %s' % bool2str(settings['verbose']),
+        ' [S] build_keep_count: %s' % settings['build_keep_count'],
+        ' [S] log_rewrite: %s' % bool2str(settings['log_rewrite']),
         ' [P] project_root: %s' % settings['project_root'],
         ' [P] project_title: %s' % settings['project_title'],
         ' [P] project_descr: %s' % settings['project_descr'],
@@ -594,9 +612,14 @@ def cleanup_builds(settings):
 def cleanup_log(settings):
 
     TMP_NAME = 'proj2gpt.tmp'
-    TMP_ROOT = os.path.join(os.getcwd(), LOG_NAME)
+    TMP_ROOT = os.path.join(os.getcwd(), TMP_NAME)
 
-    max_lines = settings.get('max_log_lines', 0)
+    max_lines = settings['max_log_lines']
+
+    log_rewrite = settings['log_rewrite']
+    if log_rewrite:
+        max_lines = sys.maxsize
+    
     if max_lines <= 0:
         return
     if not os.path.isfile(LOG_ROOT):
@@ -625,7 +648,6 @@ def cleanup_log(settings):
 #
 
 def main():
-    global LOG_ROOT
 
     proj_root = os.getcwd()
     settings = load_config(proj_root)
@@ -633,7 +655,6 @@ def main():
 
     os.makedirs(settings['dest_root'], exist_ok=True)
 
-    LOG_ROOT = os.path.join(settings['dest_root'], LOG_NAME)
     log_divider()
     log_message(f'START {__app__} v{__version__}', display=False, date=True)
 
@@ -643,11 +664,11 @@ def main():
 
     group_roots_to_paths(proj_root, settings)
 
-    if verbose and settings.get('group_paths'):
+    if verbose and settings['group_paths']:
         group_paths = ', '.join(settings['group_paths'])
         log_message(f'Compiled group paths: {group_paths}')
 
-    if verbose and settings.get('group_roots'):
+    if verbose and settings['group_roots']:
         group_roots = ', '.join(settings['group_roots'])
         log_message(f'Compiled group roots: {group_roots}')
 
