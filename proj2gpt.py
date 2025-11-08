@@ -16,6 +16,7 @@ import re
 import shutil
 import sys
 import unicodedata
+from collections import deque
 from datetime import datetime, timezone
 from fnmatch import fnmatch
 from textwrap import dedent
@@ -590,6 +591,35 @@ def cleanup_builds(settings):
             shutil.rmtree(build_root)
             log_message(f'Removed: /{build_name}')
 
+def cleanup_log(settings):
+
+    TMP_NAME = 'proj2gpt.tmp'
+    TMP_ROOT = os.path.join(os.getcwd(), LOG_NAME)
+
+    max_lines = settings.get('max_log_lines', 0)
+    if max_lines <= 0:
+        return
+    if not os.path.isfile(LOG_ROOT):
+        return
+
+    lines = deque(maxlen=max_lines)
+
+    src = open(LOG_ROOT, 'r', encoding='utf-8', errors='replace')
+    try:
+        for line in src:
+            lines.append(line)
+    finally:
+        src.close()
+
+    dst = open(TMP_ROOT, 'w', encoding='utf-8', newline='')
+    try:
+        dst.writelines(lines)
+    finally:
+        dst.close()
+
+    os.remove(LOG_ROOT)
+    os.replace(TMP_ROOT, LOG_ROOT)
+
 #
 # MAIN
 #
@@ -634,9 +664,9 @@ def main():
     # delete old builds
 
     cleanup_builds(settings)
+    cleanup_log(settings)
     
     return 0
-
 
 if __name__ == '__main__':
     sys.exit(main())

@@ -7,12 +7,12 @@ TODO
 - add to documentation note about symlink ignoring
 - calc diff, show & write to diff.txt
 - merge names_ignored with .gitignore (if enabled & file exists), recursively
-- limit log size by number of lines
 - unit tests (long strings, non-unicode, exceptions, etc)
 
 DONE
 ----
 
++ limit log size by number of lines
 + add old builds autodeletion (by quantity)
 + write function for existing builds reading: list_dirs()
 + before close show run summary
