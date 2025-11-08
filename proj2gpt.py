@@ -505,7 +505,9 @@ def generate_containers(groups, settings):
 
         group_file.write(container_txt)
         group_file.close()
-
+        
+        log_message(f'Created: {container_name}')
+        
     # write global TOC
 
     global_toc_title = f'TOC BUILD: {context_name}\n'
@@ -514,6 +516,8 @@ def generate_containers(groups, settings):
     toc_root = op_normjoin(settings['context_root'], TOC_NAME)
     with open(toc_root, 'w', encoding='utf-8', newline='\n') as toc_file:
         toc_file.write(global_toc)
+
+    log_message(f'Created: {TOC_NAME}')
 
 def generate_instructions(groups, settings):
     
@@ -525,7 +529,7 @@ def generate_instructions(groups, settings):
         [STRUCTURE]
         The following files are attached to the project:
 
-        - toc.txt - project contents (list of groups and the files included in them);
+        - toc.txt - project contents (list of groups/containers and the files included in them);
         - context.txt - main project context (default group);
         - group__*.txt - containers of the project’s structural groups, united by something in common, for example: functionally (modules), by time (events), by content (sections);
         - environment.txt - conditions and additional information about the project (optional);
@@ -553,6 +557,8 @@ def generate_instructions(groups, settings):
     rul_root = op_normjoin(settings['context_root'], INS_NAME)
     with open(rul_root, 'w', encoding='utf-8', newline='\n') as f:
         f.write(s)
+
+    log_message(f'Created: {INS_NAME}')
 
 #
 # MAIN

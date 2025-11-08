@@ -2,7 +2,6 @@
 TODO
 ----
 
-- before close show run summary
 - write function for existing builds reading
 - add old builds autodeletion (by quantity)
 - write function to parse TOC file
@@ -16,6 +15,7 @@ TODO
 DONE
 ----
 
++ before close show run summary
 + instructions.txt (project description to AI model)
 + check long line reading
 + check 0-byte files processing (insert <empty file> placeholder)
