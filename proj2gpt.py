@@ -151,7 +151,7 @@ DEFAULTS = {
     'GENERATOR': {
         'dest_path': '/proj2gpt',
         'max_text_size': '3000000',  # bytes
-        'max_log_lines': '3000', 
+        'max_log_lines': '10000', 
     },
 }
 
