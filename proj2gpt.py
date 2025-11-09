@@ -20,7 +20,6 @@ from collections import deque
 from datetime import datetime, timezone
 from fnmatch import fnmatch
 from textwrap import dedent
-from pprint import pprint
 
 #
 # GLOBALS
@@ -44,7 +43,7 @@ LOG_TDIV = 2
 LOG_TSEP = 4
 
 def log_output(message, type=LOG_TMSG, display=True, date=False):
-    if type == LOG_TMSG and display:
+    if display:
         print(message)
     with open(LOG_ROOT, 'a', encoding='utf-8') as f:
         if type != LOG_TMSG:
@@ -57,11 +56,11 @@ def log_output(message, type=LOG_TMSG, display=True, date=False):
                 ts = f"[{now:%H:%M:%S}.{now.microsecond//1000:03d} Z] "
             f.write(f'{ts}{message}\n')
 
-def log_divider():
-    log_output('='*20, LOG_TDIV)
+def log_divider(display=True):
+    log_output('='*20, LOG_TDIV, display)
 
-def log_separator():
-    log_output('-'*10, LOG_TSEP)
+def log_separator(display=True):
+    log_output('-'*10, LOG_TSEP, display)
 
 def log_message(message, display=True, date=False):
     log_output(message, type=LOG_TMSG, display=display, date=date)
@@ -153,6 +152,7 @@ def print_intro(verbose):
 INI_NAME = 'proj2gpt.ini'
 TOC_NAME = 'toc.txt'
 INS_NAME = 'instructions.txt'
+DFF_NAME = 'diff.txt'
 
 DEFAULTS = {
     'SETTINGS': {
@@ -354,7 +354,10 @@ def traverse(settings, proj_root):
 
     def rel_to_root(dir_root): return os.path.relpath(dir_root, proj_root)
 
-    def walk(dir_root: str, _parent_git_masks=[]):
+    def walk(dir_root: str, _parent_git_masks=None):
+        if _parent_git_masks is None:
+            _parent_git_masks = []
+
         dir_path = '' if dir_root == proj_root else rel_to_root(dir_root)
         dir_name = os.path.basename(dir_root)
 
@@ -494,7 +497,6 @@ def groups_limiter(groups, settings):
                 chunk_num += 1
             add_new_group(group_path, group_name, chunk_files, chunk_num)
 
-    #pprint(new_groups)
     return new_groups
 
 #
@@ -630,35 +632,143 @@ def generate_instructions(groups, settings):
 
     log_message(f'Created: {INS_NAME}')
 
+def diff_toc_parse(toc_path):
+    data = dict()
+
+    if not os.path.isfile(toc_path):
+        return data
+
+    current_group = None
+
+    with open(toc_path, 'r', encoding='utf-8') as toc_file:
+        for raw_line in toc_file:
+            line = raw_line.strip()
+            if not line:
+                continue
+            if line.startswith('TOC BUILD:'):
+                continue
+
+            if line.startswith('GROUP ORIG_PATH:'):
+                m = re.match(
+                    r'^GROUP ORIG_PATH:\s*"([^"]*)";\s*CONTAINER:\s*"([^"]*)"',
+                    line
+                )
+                if not m:
+                    continue
+
+                group_path = m.group(1)
+                container = m.group(2)
+
+                current_group = {
+                    'container': container,
+                    'hashes': [],
+                }
+                data[group_path] = current_group
+                continue
+
+            if line.startswith('FILE PATH:') and current_group is not None:
+                m = re.match(
+                    r'^FILE PATH:\s*"[^"]*";\s*OFFSET:\s*\d+;'
+                    r'\s*SIZE:\s*\d+;\s*HASH:\s*([0-9a-fA-F]+)',
+                    line
+                )
+                if m:
+                    file_hash = m.group(1)
+                    current_group['hashes'].append(file_hash)
+
+    for group in data.values():
+        group['hashes'].sort()
+        hashes_str = ''.join(group['hashes'])
+        group['hash'] = sha256_10(hashes_str)
+
+    return data
+
+def diff_calc(toc_data_old, toc_data_new):
+    report = list()
+
+    old_groups = set(toc_data_old.keys())
+    new_groups = set(toc_data_new.keys())
+
+    added_groups = sorted(new_groups - old_groups)
+    removed_groups = sorted(old_groups - new_groups)
+    common_groups = sorted(old_groups & new_groups)
+
+    for gpath in added_groups:
+        g = toc_data_new[gpath]
+        report.append(f'New group: {gpath} -> {g["container"]}')
+
+    for gpath in removed_groups:
+        g = toc_data_old[gpath]
+        report.append(f'Removed group: {gpath} -> {g["container"]}')
+
+    for gpath in common_groups:
+        old_hash = toc_data_old[gpath]['hash']
+        new_hash = toc_data_new[gpath]['hash']
+
+        if old_hash != new_hash:
+            g = toc_data_new[gpath]
+            report.append(f'Changed group: {gpath} -> {g["container"]}')
+
+    if not report:
+        report.append('No differences between last builds.')
+
+    return report
+
+def diff_make(settings):
+    build_names = list_dirs(settings['dest_root'])
+    if len(build_names) < 2:
+        log_message('This is the initial build, no diff available.')
+        return
+
+    toc_path_new = op_normjoin(settings['dest_root'], build_names[0], TOC_NAME)
+    toc_data_new = diff_toc_parse(toc_path_new)
+
+    toc_path_old = op_normjoin(settings['dest_root'], build_names[1], TOC_NAME)
+    toc_data_old = diff_toc_parse(toc_path_old)
+
+    diff_report = diff_calc(toc_data_old, toc_data_new)
+
+    for diff_message in diff_report:
+        log_message(diff_message)
+
+    dff_root = op_normjoin(settings['context_root'], DFF_NAME)
+    with open(dff_root, 'w', encoding='utf-8', newline='\n') as dff_file:
+        dff_file.write('\n'.join(diff_report) + '\n')
+
 def cleanup_builds(settings):
 
     build_keep_count = settings['build_keep_count']
     build_names = list_dirs(settings['dest_root'])
 
-    if (not build_names          # nothing to delete
-     or build_keep_count <= 0):  # unlimited
-         return
+    if build_keep_count <= 0:  # unlimited
+        log_message('Builds auto cleanup disabled.')
+        return
 
-    i = 0
-    for build_name in build_names:
+    if len(build_names) < 2:   # nothing to delete
+        log_message('There are no builds to remove.')
+        return
 
-        i += 1
+    del_count = 0
+    for index, build_name in enumerate(build_names, start=1):
         build_root = op_normjoin(settings['dest_root'], build_name)
-        if (i > build_keep_count         # build is redundant
-        and os.path.isdir(build_root)):  # is dir
+        if (index > build_keep_count     # build is redundant
+        and os.path.isdir(build_root)):  # and is dir..
             shutil.rmtree(build_root)
+            del_count += 1
             log_message(f'Removed: /{build_name}')
+
+    if del_count == 0:
+        log_message('No builds were removed.')
 
 def cleanup_log(settings):
 
     TMP_NAME = 'proj2gpt.tmp'
-    TMP_ROOT = os.path.join(os.getcwd(), TMP_NAME)
+    TMP_ROOT = os.path.join(settings['dest_root'], TMP_NAME)
 
     max_lines = settings['max_log_lines']
 
-    log_rewrite = settings['log_rewrite']
-    if log_rewrite:
-        max_lines = sys.maxsize
+    if settings['log_rewrite']:
+        return  # trimming not needed for fresh log
 
     if max_lines <= 0:
         return
@@ -680,7 +790,6 @@ def cleanup_log(settings):
     finally:
         dst.close()
 
-    os.remove(LOG_ROOT)
     os.replace(TMP_ROOT, LOG_ROOT)
 
 #
@@ -695,7 +804,7 @@ def main():
 
     os.makedirs(settings['dest_root'], exist_ok=True)
 
-    log_divider()
+    log_divider(display=False)
     log_message(f'START {__app__} v{__version__}', display=False, date=True)
 
     print_intro(verbose)
@@ -712,22 +821,25 @@ def main():
         group_roots = ', '.join(settings['group_roots'])
         log_message(f'Compiled group roots: {group_roots}')
 
-    # collecting data
+    # collect data
 
     groups = traverse(settings, proj_root)
     groups = groups_limiter(groups, settings)
 
-    # generating output
+    # generate output
 
+    log_separator()
     generate_containers(groups, settings)
     generate_instructions(groups, settings)
 
-    # calc diff
+    # calc & show diff
 
-    # ...
+    log_separator()
+    diff_make(settings)
 
     # clean up
 
+    log_separator()
     cleanup_builds(settings)
     cleanup_log(settings)
 
