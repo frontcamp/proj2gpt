@@ -158,15 +158,16 @@ DEFAULTS = {
     'SETTINGS': {
         'debug': '0',    # log debug information
         'verbose': '1',  # show status & progress information
-        'build_keep_count': '0',  # how many builds to keep, 0 = unlimited
-        'log_rewrite': '0',       # start a new log each run; True disables max_log_lines
+        'build_keep_count': '5',  # how many builds to keep, 0 = unlimited
+        'log_rewrite': '1',       # start a new log each run; True disables max_log_lines
+        'max_log_lines': '50000',
     },
     'PROJECT': {
         'project_title': 'Common',
         'project_descr': 'Working on the project',
         'group_paths': '',    # <group_path1>[, <group_path2> ...]
         'group_roots': '',    # <group_root1>[, <group_root2> ...]
-        'secrets_auto': '1',  # auto replace everything to <name>.gpt
+        'auto_secrets': '1',  # auto replace everything to <name>.gpt
     },
     'TRAVERSAL': {
         'names_allowed': '*.cfg,*.conf,*.css,*.html,*.ini,*.js,*.json,*.md,*.php,*.py,*.txt,*.xml',
@@ -177,7 +178,6 @@ DEFAULTS = {
     'GENERATOR': {
         'dest_path': '/proj2gpt',
         'max_text_size': '3000000',  # bytes
-        'max_log_lines': '20000',
     },
 }
 
@@ -205,13 +205,14 @@ def load_config(proj_root):
     settings['verbose'] = cp.getboolean('SETTINGS', 'verbose')
     settings['build_keep_count'] = cp.getint('SETTINGS', 'build_keep_count')
     settings['log_rewrite'] = cp.getboolean('SETTINGS', 'log_rewrite')
+    settings['max_log_lines'] = cp.getint('SETTINGS', 'max_log_lines')
 
     # PROJECT
     settings['project_title'] = cp.get('PROJECT', 'project_title')
     settings['project_descr'] = cp.get('PROJECT', 'project_descr')
     settings['group_paths'] = _parse_ini_list(cp.get('PROJECT', 'group_paths'))
     settings['group_roots'] = _parse_ini_list(cp.get('PROJECT', 'group_roots'))
-    settings['secrets_auto'] = cp.getboolean('PROJECT', 'secrets_auto')
+    settings['auto_secrets'] = cp.getboolean('PROJECT', 'auto_secrets')
 
     # TRAVERSAL
     settings['names_allowed'] = _parse_ini_list(cp.get('TRAVERSAL', 'names_allowed'))
@@ -222,7 +223,6 @@ def load_config(proj_root):
     # GENERATOR
     settings['dest_path'] = op_normpath(cp.get('GENERATOR', 'dest_path').strip())
     settings['max_text_size'] = cp.getint('GENERATOR', 'max_text_size')
-    settings['max_log_lines'] = cp.getint('GENERATOR', 'max_log_lines')
 
     # set global debug mode
     DEBUG = settings['debug']
@@ -258,12 +258,13 @@ def summarize_settings(settings):
         ' [S] verbose: %s' % bool2str(settings['verbose']),
         ' [S] build_keep_count: %s' % settings['build_keep_count'],
         ' [S] log_rewrite: %s' % bool2str(settings['log_rewrite']),
+        ' [S] max_log_lines: %s' % settings['max_log_lines'],
         ' [P] project_root: %s' % settings['project_root'],
         ' [P] project_title: %s' % settings['project_title'],
         ' [P] project_descr: %s' % settings['project_descr'],
         ' [P] group_paths: %s' % (', '.join(settings['group_paths']) if settings['group_paths'] else '<none>'),
         ' [P] group_roots: %s' % (', '.join(settings['group_roots']) if settings['group_roots'] else '<none>'),
-        ' [P] secrets_auto: %s' % bool2str(settings['secrets_auto']),
+        ' [P] auto_secrets: %s' % bool2str(settings['auto_secrets']),
         ' [T] names_allowed: %s' % (', '.join(settings['names_allowed']) if settings['names_allowed'] else '<none>'),
         ' [T] names_ignored: %s' % (', '.join(settings['names_ignored']) if settings['names_ignored'] else '<none>'),
         ' [T] use_gitignore: %s' % bool2str(settings['use_gitignore']),
@@ -274,7 +275,6 @@ def summarize_settings(settings):
         ' [G] context_path: %s' % (settings['context_path']),
         ' [G] context_root: %s' % (settings['context_root']),
         ' [G] max_text_size: %s' % settings['max_text_size'],
-        ' [G] max_log_lines: %s' % settings['max_log_lines'],
     ]
     return '\n'.join(lines)
 
@@ -538,7 +538,7 @@ def generate_containers(groups, settings):
 
             file_root = file_data['file_root']
 
-            srce_root = stub_root if stub_exists else file_root
+            srce_root = stub_root if settings['auto_secrets'] and stub_exists else file_root
 
             # read file content, decode as UTF-8
 
@@ -602,19 +602,17 @@ def generate_instructions(groups, settings):
         The following files are attached to the project:
 
         - toc.txt - project contents (list of groups/containers and the files included in them);
-        - context.txt - main project context (default group);
+        - context.txt - main project context (default group, if present);
         - group__*.txt - containers of the project’s structural groups, united by something in common, for example: functionally (modules), by time (events), by content (sections);
         - environment.txt - conditions and additional information about the project (optional);
-        - rules.txt - these instructions;
-        - strategy.txt - current strategy, updated as the work progresses (optional);
-        - proj2gpt.txt - documentation for the context generator.
+        - instructions.txt - these instructions.
 
         [NAVIGATION]
         Use toc.txt to determine the text container, offset, and length of the text block that contains the file’s content within the project context.
         The file content is located between the markers [## BEGIN FILE: "..." ##] and [## END FILE: "..." ##] in the corresponding container.
 
         [FORMAT]
-        The project context is generated by the proj2gpt utility; see the attached file proj2gpt.txt for documentation and format details.
+        The project context is generated by the proj2gpt utility; see the (optionally) attached file readme.txt for documentation and format details.
 
         [BEHAVIOR]
         The project discussion is conducted in the same language as the user’s question until something else is explicitly requested.
