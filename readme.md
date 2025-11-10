@@ -144,7 +144,7 @@ You can update this file manually, or automate the update by placing it in the p
 
 After generating the context (a build), Proj2GPT prints information about changes relative to the previous build (diff). Your task is to monitor this and apply the same changes to the files in the ChatGPT project. Using this simple mechanism, the AI will work with an up-to-date context of your project.
 
-Additionally, it is recommended to upload the Proj2GPT README (readme.txt) to the ChatGPT project so that the model has direct access to the container format and file structure description.
+Additionally, it is recommended to upload the Proj2GPT README (readme.md) to the ChatGPT project so that the model has direct access to the container format and file structure description.
 
 
 Important
