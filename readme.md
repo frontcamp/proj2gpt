@@ -18,7 +18,7 @@ Quick Start
 Detailed installation and configuration instructions are provided in the following sections.
 
 1. Create a new project in ChatGPT
-2. Run `proj2gpt` in the project root
+2. Run `proj2gpt.py` in the project root
 3. Upload the build files from `/proj2gpt/{datetime}/*.*` into the ChatGPT project
 4. Paste the text from `instructions.txt` into the project instructions in ChatGPT
 5. Keep the files in the ChatGPT project in sync according to `diff.txt`
@@ -63,7 +63,7 @@ If the amount of text in the main context container or a group container exceeds
 - `group__SomeModule__02.txt`
 - ...
 
-If all files are in groups, the file `context.txt` may be absent.
+Note: if all files are in groups, the file `context.txt` may be absent.
 
 
 Configuration
@@ -71,7 +71,7 @@ Configuration
 
 Configuration is done via an initialization file located in the directory where the utility is run (in the root of any project): `proj2gpt.ini`.
 
-The initialization file may contain four sections. Below is a list of sections with their available parameters. The values shown are defaults.
+The initialization file may contain four sections. Below is a list of sections with their available parameters. All sections and parameters are optional. The values shown are defaults.
 
 ```ini
 [SETTINGS]
@@ -128,7 +128,7 @@ group_paths = /docs, /libs
 group_roots = /history
 ```
 
-All subdirectories of `/history` (for example `/history/event/*`) will be automatically added to `group_paths`.
+All subdirectories of `/history` (e.g. `/history/event*/`) will be automatically added to `group_paths`.
 
 `auto_secrets` better not to disable. For every configuration file that contains sensitive data (logins, passwords, keys, names, etc.) create a copy with the extension `*.gpt` next to it. In this copy, mask sensitive data with asterisks or leave the corresponding fields empty. This is required so that these data do not end up in the ChatGPT context and do not become publicly available.
 
@@ -136,7 +136,7 @@ All subdirectories of `/history` (for example `/history/event/*`) will be automa
 
 `names_ignored` - patterns for files and paths that will be excluded from the context.
 
-Logic is simple: Proj2GPT collects all files allowed by `names_allowed` patterns, but excluding those that match `names_ignored`.
+Logic is simple: Proj2GPT collects all files allowed by `names_allowed` patterns, but excludes those that match `names_ignored`.
 
 `max_file_size` - must be set to prevent extremely large files (for example, logs) from being included in a build.
 
@@ -228,7 +228,7 @@ Fields:
 - `SIZE` – total byte size of the frame (header + body + footer, UTF-8 bytes).
 - `HASH` – 10-character hexadecimal prefix of the SHA-256 hash of the **normalized file body only** (without header and footer).
 
-For each group, an aggregate hash is computed from the per-file hashes and stored internally; this is used to detect changes between builds and to generate diff.txt. The combination of CONTAINER + OFFSET + SIZE uniquely identifies the text block in the project context that corresponds to a specific source file.
+For each group, an aggregate hash is computed from the per-file hashes and stored internally; this is used to detect changes between builds and to generate `diff.txt`. The combination of CONTAINER + OFFSET + SIZE uniquely identifies the text block in the project context that corresponds to a specific source file.
 
 ### Diff report (`diff.txt`)
 
