@@ -4,7 +4,9 @@ Proj2GPT ver: 0.1.0
 ===================
 
 This utility is a free alternative to Copilot. It can work not only with software projects but with any text-based projects: books, planning, management, research, analytics, etc.
+
 Proj2GPT collects the text context of a project and packs it into text containers for uploading into a ChatGPT project (creating projects requires a paid subscription).
+
 This allows ChatGPT to work with the project, taking its context and architecture into account.
 
 Proj2GPT helps you get the most out of AI without additional cost.
@@ -71,6 +73,7 @@ Configuration is done via an initialization file located in the directory where 
 
 The initialization file may contain four sections. Below is a list of sections with their available parameters. The values shown are defaults.
 
+```ini
 [SETTINGS]
 debug = 0              # <0|1> enable/disable debug output
 verbose = 1            # <0|1> show status and progress information
@@ -94,23 +97,29 @@ max_file_size = 1000000  # <bytes> max size of a file included in context
 [GENERATOR]
 dest_path = /proj2gpt    # directory where builds are generated
 max_text_size = 3000000  # <bytes> max size of a text container
-
+```
 
 Parameter details
 
 build_keep_count > 2 usually not required: the smaller the number, the less disk space is used by builds.
+
 log_rewrite = 1 is optimal for normal usage (only information about the last run is kept in the log).
+
 project_title & project_descr - recommended to set properly, since they are used in ChatGPT instructions. A short project name and a short project description are sufficient. For example:
 
+```ini
 project_title = Proj2GPT
 project_descr = Package project (text) sources into TXT containers for ChatGPT.
+```
 
 group_paths - comma-separated list of group paths; the list may be continued on new lines, for example:
 
+```ini
 group_paths = /docs, /libs,
               /history/event1/,
               /history/event2/,
               /history/event3/,
+```
 
 group_roots - convenient for automatic group generation; the example above can be written as:
 
@@ -122,6 +131,7 @@ All subdirectories of /history (for example /history/event*) will be automatical
 auto_secrets better not to disable. For every configuration file that contains sensitive data (logins, passwords, keys, names, etc.) create a copy with the extension *.gpt next to it. In this copy, mask sensitive data with asterisks or leave the corresponding fields empty. This is required so that these data do not end up in the ChatGPT context and do not become publicly available.
 
 names_allowed - patterns for files and paths that will be collected into the project context.
+
 names_ignored - patterns for files and paths that will be excluded from the context.
 
 Logic is simple: Proj2GPT collects all files allowed by names_allowed patterns, but excluding those that match names_ignored.
@@ -175,28 +185,28 @@ The file is a concatenation of *frames*, one frame per original source file.
 Frame layout:
 
 - Header line:
-  [## BEGIN FILE: "<PATH>" ##]
+  `[## BEGIN FILE: "<PATH>" ##]`
 
 - File body:
-  Original file contents decoded as UTF-8 and normalized to "\n" line endings.
+  Original file contents decoded as UTF-8 and normalized to `\n` line endings.
+
   Special cases:
-  - Empty file → [## NOTE: EMPTY FILE ##]
+
+  - Empty file → `[## NOTE: EMPTY FILE ##]`
   - Read / decode error →
-    [## ERROR: FILE CANNOT BE READ DUE TO I/O ERROR! ##] or
-    [## ERROR: FILE CANNOT BE READ DUE TO UNICODE DECODING ERROR! ##]
+    `[## ERROR: FILE CANNOT BE READ DUE TO I/O ERROR! ##]` or
+    `[## ERROR: FILE CANNOT BE READ DUE TO UNICODE DECODING ERROR! ##]`
 
 - Footer line:
   [## END FILE: "<PATH>" ##]
 
 Where:
 
-- <PATH> is the file path relative to the project root, prefixed with the OS path separator
+- `<PATH>` is the file path relative to the project root, prefixed with the OS path separator
   (for example `\src\main.py` on Windows).
 - Frames in a container appear in deterministic order.
 
-If a container is split into multiple parts (because of `max_text_size`), each part is an independent
-container file with the same frame format and a subset of frames. Part files are named with a numeric
-suffix, e.g. context__01.txt, group__SomeModule__02.txt.
+If a container is split into multiple parts (because of `max_text_size`), each part is an independent container file with the same frame format and a subset of frames. Part files are named with a numeric suffix, e.g. `context__01.txt`, `group__SomeModule__02.txt`.
 
 ### Table of contents (toc.txt)
 
