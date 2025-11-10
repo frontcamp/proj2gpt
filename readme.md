@@ -1,4 +1,4 @@
-[![Proj2GPT](assets/logo.png?v=3)](https://github.com/frontcamp/proj2gpt)
+[![Proj2GPT](assets/logo.png?v5)](https://github.com/frontcamp/proj2gpt)
 
 Proj2GPT ver: 0.1.0
 ===================
