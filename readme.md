@@ -5,7 +5,7 @@ Proj2GPT ver: 0.1.0
 
 This utility is a free alternative to Copilot. It can work not only with software projects but with any text-based projects: books, planning, management, research, analytics, etc.
 
-Proj2GPT collects the text context of a project and packs it into text containers for uploading into a ChatGPT project (creating projects requires a paid subscription).
+Proj2GPT collects the text context of a project and packs it into text containers for uploading into a ChatGPT project (creating projects requires a paid "Plus" ChatGPT subscription).
 
 This allows ChatGPT to work with the project, taking its context and architecture into account.
 
@@ -18,10 +18,10 @@ Quick Start
 Detailed installation and configuration instructions are provided in the following sections.
 
 1. Create a new project in ChatGPT
-2. Run proj2gpt in the project root
-3. Upload the build files from /proj2gpt/{datetime}/*.* into the ChatGPT project
-4. Paste the text from instructions.txt into the project instructions in ChatGPT
-5. Keep the files in the ChatGPT project in sync according to diff.txt
+2. Run `proj2gpt` in the project root
+3. Upload the build files from `/proj2gpt/{datetime}/*.*` into the ChatGPT project
+4. Paste the text from `instructions.txt` into the project instructions in ChatGPT
+5. Keep the files in the ChatGPT project in sync according to `diff.txt`
 6. Start new conversations and discuss the project with AI, taking its architecture and context into account
 
 
@@ -34,7 +34,7 @@ Python 3.6 or higher must be installed on the system.
 Installation
 ------------
 
-Download the proj2gpt.py script to your computer. Add the directory containing the script to the system PATH so you can run it from the command line in any directory.
+Download the `proj2gpt.py` script to your computer. Add the directory containing the script to the system `PATH` so you can run it from the command line in any directory.
 
 
 Running
@@ -43,33 +43,33 @@ Running
 Run the utility from the project root directory.
 The result of the utility is a *build* — a directory with project context files:
 
-/proj2gpt/YYYYMMDD-HHMMSS/*
+`/proj2gpt/YYYYMMDD-HHMMSS/*`
 
 where YYYYMMDD-HHMMSS is the build generation date and time.
 The following files will be created inside this directory:
 
-- context.txt – main project context
-- diff.txt – difference between this and the previous build
-- group__*.txt – context for semantic project groups (modules, chapters, events)
-- instructions.txt – instructions for ChatGPT about the project and files
-- toc.txt – table of contents (list of containers and their contents)
+- `context.txt` – main project context
+- `diff.txt` – difference between this and the previous build
+- `group__*.txt` – context for semantic project groups (modules, chapters, events)
+- `instructions.txt` – instructions for ChatGPT about the project and files
+- `toc.txt` – table of contents (list of containers and their contents)
 
 If the amount of text in the main context container or a group container exceeds the configured limit (3 MB by default), the file is split into parts. In this case a part number is appended to the file name, for example:
 
-- context__01.txt
-- context__02.txt
+- `context__01.txt`
+- `context__02.txt`
 - ...
-- group__SomeModule__01.txt
-- group__SomeModule__02.txt
+- `group__SomeModule__01.txt`
+- `group__SomeModule__02.txt`
 - ...
 
-If all files are in groups, the file context.txt may be absent.
+If all files are in groups, the file `context.txt` may be absent.
 
 
 Configuration
 -------------
 
-Configuration is done via an initialization file located in the directory where the utility is run (in the root of any project): proj2gpt.ini.
+Configuration is done via an initialization file located in the directory where the utility is run (in the root of any project): `proj2gpt.ini`.
 
 The initialization file may contain four sections. Below is a list of sections with their available parameters. The values shown are defaults.
 
@@ -99,20 +99,20 @@ dest_path = /proj2gpt    # directory where builds are generated
 max_text_size = 3000000  # <bytes> max size of a text container
 ```
 
-Parameter details
+### Parameter details
 
-build_keep_count > 2 usually not required: the smaller the number, the less disk space is used by builds.
+`build_keep_count > 2` usually not required: the smaller the number, the less disk space is used by builds.
 
-log_rewrite = 1 is optimal for normal usage (only information about the last run is kept in the log).
+`log_rewrite = 1` is optimal for normal usage (only information about the last run is kept in the log).
 
-project_title & project_descr - recommended to set properly, since they are used in ChatGPT instructions. A short project name and a short project description are sufficient. For example:
+`project_title` & `project_descr` - recommended to set properly, since they are used in ChatGPT instructions. A short project name and a short project description are sufficient. For example:
 
 ```ini
 project_title = Proj2GPT
 project_descr = Package project (text) sources into TXT containers for ChatGPT.
 ```
 
-group_paths - comma-separated list of group paths; the list may be continued on new lines, for example:
+`group_paths` - comma-separated list of group paths; the list may be continued on new lines, for example:
 
 ```ini
 group_paths = /docs, /libs,
@@ -121,22 +121,24 @@ group_paths = /docs, /libs,
               /history/event3/,
 ```
 
-group_roots - convenient for automatic group generation; the example above can be written as:
+`group_roots` - convenient for automatic group generation; the example above can be written as:
 
+```ini
 group_paths = /docs, /libs
 group_roots = /history
+```
 
-All subdirectories of /history (for example /history/event*) will be automatically added to group_paths.
+All subdirectories of `/history` (for example `/history/event/*`) will be automatically added to group_paths.
 
-auto_secrets better not to disable. For every configuration file that contains sensitive data (logins, passwords, keys, names, etc.) create a copy with the extension *.gpt next to it. In this copy, mask sensitive data with asterisks or leave the corresponding fields empty. This is required so that these data do not end up in the ChatGPT context and do not become publicly available.
+`auto_secrets` better not to disable. For every configuration file that contains sensitive data (logins, passwords, keys, names, etc.) create a copy with the extension `*.gpt` next to it. In this copy, mask sensitive data with asterisks or leave the corresponding fields empty. This is required so that these data do not end up in the ChatGPT context and do not become publicly available.
 
-names_allowed - patterns for files and paths that will be collected into the project context.
+`names_allowed` - patterns for files and paths that will be collected into the project context.
 
-names_ignored - patterns for files and paths that will be excluded from the context.
+`names_ignored` - patterns for files and paths that will be excluded from the context.
 
-Logic is simple: Proj2GPT collects all files allowed by names_allowed patterns, but excluding those that match names_ignored.
+Logic is simple: Proj2GPT collects all files allowed by `names_allowed` patterns, but excluding those that match `names_ignored`.
 
-max_file_size - must be set to prevent extremely large files (for example, logs) from being included in a build.
+`max_file_size` - must be set to prevent extremely large files (for example, logs) from being included in a build.
 
 
 Recommendations
@@ -144,7 +146,7 @@ Recommendations
 
 To make ChatGPT take the main context into account when starting new conversations, create a file named:
 
-environment.txt
+`environment.txt`
 
 Describe in it who you are, what you do, what your motivation is, what you want to achieve, what this project is, its background and its final goal. Upload this file into the project and mention it in the instructions. For example:
 
@@ -162,7 +164,7 @@ Important
 
 The utility is intended exclusively for working with text files. There is no point in adding binary files (images, PDFs, executables, etc.) to the context.
 
-In the current version Proj2GPT does not support .gitignore patterns of the form !pattern and **.
+In the current version Proj2GPT does not support .gitignore patterns of the form `!pattern` and `**`.
 
 Only files encoded in UTF-8 are supported.
 
@@ -176,7 +178,7 @@ File formats
 
 This section describes how data is encoded in the generated text containers and in toc.txt. It is intended for AI models consuming the context.
 
-### Context and group containers (context.txt, group__*.txt)
+### Context and group containers (`context.txt`, `group__*.txt`)
 
 Each container is a UTF-8 text file.
 
@@ -184,21 +186,16 @@ The file is a concatenation of *frames*, one frame per original source file.
 
 Frame layout:
 
-- Header line:
-  `[## BEGIN FILE: "<PATH>" ##]`
+- Header line: `[## BEGIN FILE: "<PATH>" ##]`
 
-- File body:
-  Original file contents decoded as UTF-8 and normalized to `\n` line endings.
+- File body: original file contents decoded as UTF-8 and normalized to `\n` line endings.
 
   Special cases:
 
   - Empty file → `[## NOTE: EMPTY FILE ##]`
-  - Read / decode error →
-    `[## ERROR: FILE CANNOT BE READ DUE TO I/O ERROR! ##]` or
-    `[## ERROR: FILE CANNOT BE READ DUE TO UNICODE DECODING ERROR! ##]`
+  - Read / decode error → `[## ERROR: FILE CANNOT BE READ DUE TO I/O ERROR! ##]` or `[## ERROR: FILE CANNOT BE READ DUE TO UNICODE DECODING ERROR! ##]`
 
-- Footer line:
-  [## END FILE: "<PATH>" ##]
+- Footer line: `[## END FILE: "<PATH>" ##]`
 
 Where:
 
@@ -208,50 +205,43 @@ Where:
 
 If a container is split into multiple parts (because of `max_text_size`), each part is an independent container file with the same frame format and a subset of frames. Part files are named with a numeric suffix, e.g. `context__01.txt`, `group__SomeModule__02.txt`.
 
-### Table of contents (toc.txt)
+### Table of contents (`toc.txt`)
 
-toc.txt is a UTF-8 text file describing how frames are packed into containers.
+`toc.txt` is a UTF-8 text file describing how frames are packed into containers.
 
 Structure:
 
-- First line (build header):
-  TOC BUILD: <build_name>
+- First line (build header): `TOC BUILD: <build_name>`
 
-- For each group (including the default group for context.txt):
+- For each group (including the default group for `context.txt`):
 
-  - Group header line:
-    GROUP ORIG_PATH: "<group_path>"; CONTAINER: "<container_name>"
+  - Group header line: `GROUP ORIG_PATH: "<group_path>"; CONTAINER: "<container_name>"`
 
-  - One or more file entries:
-    FILE PATH: "<PATH>"; OFFSET: <byte_offset>; SIZE: <byte_size>; HASH: <hash10>
+  - One or more file entries: `FILE PATH: "<PATH>"; OFFSET: <byte_offset>; SIZE: <byte_size>; HASH: <hash10>`
 
 Fields:
 
-- <group_path> – original group path (for the default group it is the root path, e.g. "\").
-- <container_name> – container file name (e.g. context.txt, group__SomeModule__01.txt).
-- <PATH> – file path relative to project root, prefixed with the OS path separator.
-- OFFSET – starting byte offset of the frame inside the container (0-based, UTF-8 bytes).
-- SIZE – total byte size of the frame (header + body + footer, UTF-8 bytes).
-- HASH – 10-character hexadecimal prefix of the SHA-256 hash of the **normalized file body only**
-  (without header and footer).
+- `<group_path>` – original group path (for the default group it is the root path, e.g. `\`).
+- `<container_name>` – container file name (e.g. `context.txt`, `group__SomeModule__01.txt`).
+- `<PATH>` – file path relative to project root, prefixed with the OS path separator.
+- `OFFSET` – starting byte offset of the frame inside the container (0-based, UTF-8 bytes).
+- `SIZE` – total byte size of the frame (header + body + footer, UTF-8 bytes).
+- `HASH` – 10-character hexadecimal prefix of the SHA-256 hash of the **normalized file body only** (without header and footer).
 
-For each group, an aggregate hash is computed from the per-file hashes and stored internally; this is
-used to detect changes between builds and to generate diff.txt. The combination of
-CONTAINER + OFFSET + SIZE uniquely identifies the text block in the project context that
-corresponds to a specific source file.
+For each group, an aggregate hash is computed from the per-file hashes and stored internally; this is used to detect changes between builds and to generate diff.txt. The combination of CONTAINER + OFFSET + SIZE uniquely identifies the text block in the project context that corresponds to a specific source file.
 
-### Diff report (diff.txt)
+### Diff report (`diff.txt`)
 
-diff.txt is a UTF-8 text file with a human-readable summary of changes between the last two builds.
+`diff.txt` is a UTF-8 text file with a human-readable summary of changes between the last two builds.
 
 Each line describes one change, for example:
 
-- "New group: \history\event1 -> group__history__event1.txt"
-- "Removed group: \docs -> group__docs.txt"
-- "Changed group: \src -> context.txt"
-- or "No differences between last builds."
+- `New group: \history\event1 -> group__history__event1.txt`
+- `Removed group: \docs -> group__docs.txt`
+- `Changed group: \src -> context.txt`
+- or `No differences between last builds.`
 
-Models can ignore diff.txt if it is not needed for the current task.
+Models can ignore `diff.txt` if it is not needed for the current task.
 
 
 Feedback
