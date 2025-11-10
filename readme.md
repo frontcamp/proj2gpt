@@ -128,7 +128,7 @@ group_paths = /docs, /libs
 group_roots = /history
 ```
 
-All subdirectories of `/history` (for example `/history/event/*`) will be automatically added to group_paths.
+All subdirectories of `/history` (for example `/history/event/*`) will be automatically added to `group_paths`.
 
 `auto_secrets` better not to disable. For every configuration file that contains sensitive data (logins, passwords, keys, names, etc.) create a copy with the extension `*.gpt` next to it. In this copy, mask sensitive data with asterisks or leave the corresponding fields empty. This is required so that these data do not end up in the ChatGPT context and do not become publicly available.
 
@@ -150,7 +150,7 @@ To make ChatGPT take the main context into account when starting new conversatio
 
 Describe in it who you are, what you do, what your motivation is, what you want to achieve, what this project is, its background and its final goal. Upload this file into the project and mention it in the instructions. For example:
 
-"At the beginning of each conversation, read the supporting information from the file environment.txt and take it into account in your answers."
+"At the beginning of each conversation, read the supporting information from the file `environment.txt` and take it into account in your answers."
 
 You can update this file manually, or automate the update by placing it in the project root so that Proj2GPT packs it into the global context. This way any changes in this file will automatically be included in the new context.
 
@@ -176,7 +176,7 @@ The program was developed and tested only on the Windows platform.
 File formats
 ------------
 
-This section describes how data is encoded in the generated text containers and in toc.txt. It is intended for AI models consuming the context.
+This section describes how data is encoded in the generated text containers and in `toc.txt`. It is intended for AI models consuming the context.
 
 ### Context and group containers (`context.txt`, `group__*.txt`)
 
