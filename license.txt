@@ -17,6 +17,11 @@ or internal evaluation purposes only; and
 provided that (i) this License and copyright notice are included; and
 (ii) clear attribution to “Maksym Plaksin – proj2gpt” with a link to the
 repository is provided.
+Any use of this Software not provided for by this License (including
+commercial use or use of modified versions) is permitted only on the basis
+of permission from the Licensor, which may be granted upon request,
+including by electronic mail from the following address:
+maxim.plaksin@gmail.com
 
 3. Restrictions
 You may NOT:

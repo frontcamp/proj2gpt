@@ -4,6 +4,7 @@ TODO
 
 Legend: > task; ? maybe
 
+- if something was changed, report that TOC also changed
 ? unit tests (long strings, non-UTF-8, exceptions, etc)
 
 HISTORY
