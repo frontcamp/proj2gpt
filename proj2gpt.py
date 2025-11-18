@@ -620,11 +620,12 @@ def generate_instructions(groups, settings):
         In responses, explicitly refer to the project paths and files to simplify navigation.
         If the context is insufficient, specify which files/fragments are missing and stop; do not invent.
         When the user says that files or context were updated, assume that the attached toc.txt, context.txt, and any group__*.txt for this ChatGPT project are fresh and must be re-read and used.
+        There is no limit on the length of the response in this project.
 
         [BUILD HANDLING]
-        The current project build identifier is stored in toc.txt (header line: "TOC BUILD: ...").
-        The assistant must always read this identifier before analyzing the project.
-        If the build identifier is the same as the last one seen in the current conversation, the assistant must warn the user that an old build may have been uploaded and that the project files might not contain the expected changes.
+        The current project build ID is stored in the toc.txt file (first line: "TOC BUILD: ...").
+        The assistant should always read this ID before analyzing the project and mention it at the beginning of their response (so that it is clear which build is being answered and so that the build number is preserved in the context of the dialog).
+        If the user says he has updated the project files, but the build remains the same, warn the user that an old build may have been loaded and the project files may not contain the expected changes.
         """)
 
     s = s.replace('{%PROJ_TITLE%}', settings['project_title'])
