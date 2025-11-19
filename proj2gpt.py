@@ -620,7 +620,6 @@ def generate_instructions(groups, settings):
         In responses, explicitly refer to the project paths and files to simplify navigation.
         If the context is insufficient, specify which files/fragments are missing and stop; do not invent.
         When the user says that files or context were updated, assume that the attached toc.txt, context.txt, and any group__*.txt for this ChatGPT project are fresh and must be re-read and used.
-        There is no limit on the length of the response in this project.
 
         [BUILD HANDLING]
         The current project build ID is stored in the toc.txt file (first line: "TOC BUILD: ...").
