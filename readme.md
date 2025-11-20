@@ -1,6 +1,6 @@
 [![Proj2GPT](assets/banner.png)](https://github.com/frontcamp/proj2gpt)
 
-Proj2GPT ver: 0.1.0
+Proj2GPT 0.1.0-beta
 ===================
 
 This utility is a free alternative to Copilot. It can work not only with software projects but with any text-based projects: books, planning, management, research, analytics, etc.
