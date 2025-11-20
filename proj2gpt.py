@@ -72,7 +72,7 @@ def log_message(message, display=True, date=False):
 def rm_leading_slash(path):
     return path.lstrip('/\\') if path.startswith(('/', '\\')) else path
 
-def op_normpath(path): return os.path.normcase(os.path.normpath(path))
+def op_normpath(path): return os.path.normpath(path)
 def op_normjoin(*paths): return op_normpath(os.path.join(*paths))
 def op_absjoin(*paths): return os.path.abspath(op_normjoin(*paths))
 
@@ -690,6 +690,8 @@ def diff_toc_parse(toc_path):
 def diff_calc(toc_data_old, toc_data_new):
     report = list()
 
+    has_changes = False
+
     old_groups = set(toc_data_old.keys())
     new_groups = set(toc_data_new.keys())
 
@@ -700,10 +702,12 @@ def diff_calc(toc_data_old, toc_data_new):
     for gpath in added_groups:
         g = toc_data_new[gpath]
         report.append(f'New group: {gpath} -> {g["container"]}')
+        has_changes = True
 
     for gpath in removed_groups:
         g = toc_data_old[gpath]
         report.append(f'Removed group: {gpath} -> {g["container"]}')
+        has_changes = True
 
     for gpath in common_groups:
         old_hash = toc_data_old[gpath]['hash']
@@ -712,11 +716,12 @@ def diff_calc(toc_data_old, toc_data_new):
         if old_hash != new_hash:
             g = toc_data_new[gpath]
             report.append(f'Changed group: {gpath} -> {g["container"]}')
+            has_changes = True
 
     if not report:
         report.append('No differences between last builds.')
 
-    return report
+    return report, has_changes
 
 def diff_make(settings):
     build_names = list_dirs(settings['dest_root'])
@@ -730,7 +735,10 @@ def diff_make(settings):
     toc_path_old = op_normjoin(settings['dest_root'], build_names[1], TOC_NAME)
     toc_data_old = diff_toc_parse(toc_path_old)
 
-    diff_report = diff_calc(toc_data_old, toc_data_new)
+    diff_report, has_changes = diff_calc(toc_data_old, toc_data_new)
+
+    if has_changes:
+        diff_report.append('Changed file: toc.txt')
 
     for diff_message in diff_report:
         log_message(diff_message)
