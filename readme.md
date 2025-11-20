@@ -244,8 +244,10 @@ Each line describes one change, for example:
 Models can ignore `diff.txt` if it is not needed for the current task.
 
 
-Feedback
---------
+Support / Feedback
+------------------
 
-If you encounter bugs or would like to suggest improvements, contact the author by email: maxim.plaksin@gmail.com
+https://github.com/frontcamp/proj2gpt/issues
+
+Связь с автором: maxim.plaksin@gmail.com
 
