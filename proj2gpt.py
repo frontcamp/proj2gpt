@@ -151,8 +151,8 @@ def print_intro(verbose):
 
 INI_NAME = 'proj2gpt.ini'
 TOC_NAME = 'toc.txt'
-INS_NAME = 'instructions.txt'
-DFF_NAME = 'diff.txt'
+INS_NAME = '_instructions.txt'
+DFF_NAME = '_diff.txt'
 
 DEFAULTS = {
     'SETTINGS': {
